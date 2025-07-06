@@ -69,17 +69,15 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
     const { data, error: uploadError } = await supabase.storage.from('task-photos').upload(fileName, blob);
 
     if (uploadError) {
-      showError("Falha ao enviar foto. Verifique se o bucket 'task-photos' existe e é público.");
+      showError("Falha ao enviar foto.");
       console.error(uploadError);
       return;
     }
-
-    const { data: { publicUrl } } = supabase.storage.from('task-photos').getPublicUrl(data.path);
     
-    const { error: updateError } = await supabase.from('tasks').update({ photo_url: publicUrl }).eq('id', task.id);
+    const { error: updateError } = await supabase.from('tasks').update({ photo_url: data.path }).eq('id', task.id);
     
     if (updateError) {
-      showError("Erro ao salvar URL da foto.");
+      showError("Erro ao salvar caminho da foto.");
     } else {
       showSuccess("Foto salva com sucesso!");
       onUpdate();
@@ -88,21 +86,21 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   };
 
   const handleDeleteTask = async () => {
-    // 1. Delete from storage
     if (task.photo_url) {
-      const { data: listData, error: listError } = await supabase.storage
-        .from('task-photos')
-        .list(task.id, { limit: 100 });
+        const pathParts = task.photo_url.split('/');
+        const folder = pathParts.slice(0, -1).join('/');
+        const { data: listData, error: listError } = await supabase.storage
+            .from('task-photos')
+            .list(folder, { limit: 100 });
 
-      if (listError) {
-        showError("Erro ao listar fotos para deletar.");
-      } else if (listData && listData.length > 0) {
-        const filesToRemove = listData.map((file) => `${task.id}/${file.name}`);
-        await supabase.storage.from('task-photos').remove(filesToRemove);
-      }
+        if (listError) {
+            showError("Erro ao listar fotos para deletar.");
+        } else if (listData && listData.length > 0) {
+            const filesToRemove = listData.map((file) => `${folder}/${file.name}`);
+            await supabase.storage.from('task-photos').remove(filesToRemove);
+        }
     }
 
-    // 2. Delete from database
     const { error: dbError } = await supabase.from('tasks').delete().eq('id', task.id);
     if (dbError) {
       showError("Erro ao deletar tarefa.");
@@ -140,7 +138,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
             <DialogHeader>
               <DialogTitle>Foto da Tarefa: {task.title}</DialogTitle>
             </DialogHeader>
-            {task.photo_url && <img src={task.photo_url} alt="Foto da tarefa" className="my-4 rounded-lg max-h-60 w-auto mx-auto" />}
+            {task.signed_photo_url && <img src={task.signed_photo_url} alt="Foto da tarefa" className="my-4 rounded-lg max-h-60 w-auto mx-auto" />}
             <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
           </DialogContent>
         </Dialog>
@@ -201,8 +199,24 @@ const DemandDetails = () => {
 
     if (tasksError) {
       showError("Erro ao buscar tarefas.");
-    } else {
-      setTasks(tasksData || []);
+      setTasks([]);
+    } else if (tasksData) {
+      const tasksWithSignedUrls = await Promise.all(
+        tasksData.map(async (task) => {
+          if (task.photo_url) {
+            const { data, error } = await supabase.storage
+              .from('task-photos')
+              .createSignedUrl(task.photo_url, 3600); // Link válido por 1 hora
+            if (error) {
+              console.error("Error creating signed url for", task.photo_url, error);
+              return { ...task, signed_photo_url: undefined };
+            }
+            return { ...task, signed_photo_url: data.signedUrl };
+          }
+          return task;
+        })
+      );
+      setTasks(tasksWithSignedUrls);
     }
     setLoading(false);
   };

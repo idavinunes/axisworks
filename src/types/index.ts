@@ -22,11 +22,12 @@ export interface Demand {
 }
 
 export interface Task {
-  id: string;
+  id:string;
   demand_id: string;
   title: string;
   is_completed: boolean;
   duration_seconds: number;
   photo_url: string | null;
   created_at: string;
+  signed_photo_url?: string; // Adicionando a URL segura e temporária
 }
