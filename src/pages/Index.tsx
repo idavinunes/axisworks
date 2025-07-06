@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, MapPin, Briefcase, CheckSquare, AlertTriangle, BarChart3 } from "lucide-react";
+import { Users, MapPin, Briefcase, CheckSquare, AlertTriangle, BarChart3, Clock, DollarSign } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { supabase } from "@/integrations/supabase/client";
 import StatCard from "@/components/dashboard/StatCard";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface DashboardStats {
+interface AdminDashboardStats {
   current: {
     totalDemands: number;
     completedTasks: number;
@@ -22,29 +22,50 @@ interface DashboardStats {
   };
 }
 
+interface UserDashboardStats {
+  assignedDemands: number;
+  completedTasksMonth: number;
+  totalHoursMonth: number;
+  totalCostMonth: number;
+  totalCostWeek: number;
+}
+
 const Index = () => {
   const { profile } = useSession();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
+  const [userStats, setUserStats] = useState<UserDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!profile) return;
+
     const fetchStats = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase.functions.invoke("get-dashboard-stats");
-      
-      if (error) {
-        setError("Falha ao carregar as estatísticas do dashboard.");
-        console.error(error);
+
+      if (profile.role === 'admin' || profile.role === 'supervisor') {
+        const { data, error } = await supabase.functions.invoke("get-dashboard-stats");
+        if (error) {
+          setError("Falha ao carregar as estatísticas do dashboard.");
+          console.error(error);
+        } else {
+          setAdminStats(data);
+        }
       } else {
-        setStats(data);
+        const { data, error } = await supabase.functions.invoke("get-user-dashboard-stats");
+        if (error) {
+          setError("Falha ao carregar suas estatísticas.");
+          console.error(error);
+        } else {
+          setUserStats(data);
+        }
       }
       setLoading(false);
     };
 
     fetchStats();
-  }, []);
+  }, [profile]);
 
   const renderSkeletons = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -63,39 +84,76 @@ const Index = () => {
     </div>
   );
 
+  const renderAdminDashboard = () => (
+    <>
+      {adminStats && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard 
+            title="Total de Usuários"
+            value={adminStats.current.totalUsers}
+            icon={<Users className="h-4 w-4 text-muted-foreground" />}
+            changeDescription=""
+          />
+          <StatCard 
+            title="Demandas no Mês"
+            value={adminStats.current.totalDemands}
+            icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}
+            change={adminStats.changes.totalDemands}
+          />
+          <StatCard 
+            title="Tarefas Concluídas no Mês"
+            value={adminStats.current.completedTasks}
+            icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
+            change={adminStats.changes.completedTasks}
+          />
+          <StatCard 
+            title="Demandas Atrasadas"
+            value={adminStats.current.delayedDemands}
+            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+            change={adminStats.changes.delayedDemands}
+          />
+        </div>
+      )}
+    </>
+  );
+
+  const renderUserDashboard = () => (
+    <>
+      {userStats && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard 
+            title="Valor a Receber (Semana)"
+            value={`R$ ${userStats.totalCostWeek.toFixed(2).replace('.', ',')}`}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard 
+            title="Valor a Receber (Mês)"
+            value={`R$ ${userStats.totalCostMonth.toFixed(2).replace('.', ',')}`}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard 
+            title="Horas Trabalhadas (Mês)"
+            value={`${userStats.totalHoursMonth.toFixed(2).replace('.', ',')}h`}
+            icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard 
+            title="Tarefas Concluídas (Mês)"
+            value={userStats.completedTasksMonth}
+            icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
+          />
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Painel de Controle</h1>
       
       {loading ? renderSkeletons() : error ? (
         <p className="text-red-500">{error}</p>
-      ) : stats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard 
-            title="Total de Usuários"
-            value={stats.current.totalUsers}
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            changeDescription=""
-          />
-          <StatCard 
-            title="Demandas no Mês"
-            value={stats.current.totalDemands}
-            icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}
-            change={stats.changes.totalDemands}
-          />
-          <StatCard 
-            title="Tarefas Concluídas no Mês"
-            value={stats.current.completedTasks}
-            icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
-            change={stats.changes.completedTasks}
-          />
-          <StatCard 
-            title="Demandas Atrasadas"
-            value={stats.current.delayedDemands}
-            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
-            change={stats.changes.delayedDemands}
-          />
-        </div>
+      ) : (
+        profile?.role === 'admin' || profile?.role === 'supervisor' ? renderAdminDashboard() : renderUserDashboard()
       )}
 
       <div className="grid gap-6 md:grid-cols-2 pt-6">
@@ -108,10 +166,10 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Cadastre clientes, gerencie endereços e crie demandas de serviço para cada local.
+              Acesse as demandas de serviço, inicie e finalize tarefas em cada local.
             </CardDescription>
             <Button asChild className="mt-4">
-              <Link to="/locations">Gerenciar Locais</Link>
+              <Link to="/locations">Acessar Locais</Link>
             </Button>
           </CardContent>
         </Card>
