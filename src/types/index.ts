@@ -1,9 +1,3 @@
-export interface Employee {
-  id: string;
-  name: string;
-  role: string;
-}
-
 export type UserRole = "admin" | "supervisor" | "user";
 
 export interface Profile {
