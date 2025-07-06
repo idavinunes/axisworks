@@ -34,13 +34,17 @@ const UserWorkReport = () => {
 
       setLoading(true);
 
-      // Ajusta a data final para o fim do dia, garantindo que o dia inteiro seja incluído.
+      // Ajusta a data de início para o começo do dia
+      const adjustedStartDate = new Date(date.from);
+      adjustedStartDate.setHours(0, 0, 0, 0);
+
+      // Ajusta a data final para o fim do dia
       const adjustedEndDate = new Date(date.to);
       adjustedEndDate.setHours(23, 59, 59, 999);
 
       const { data, error } = await supabase.functions.invoke("get-user-work-report", {
         body: {
-          startDate: date.from.toISOString(),
+          startDate: adjustedStartDate.toISOString(),
           endDate: adjustedEndDate.toISOString(),
         },
       });
