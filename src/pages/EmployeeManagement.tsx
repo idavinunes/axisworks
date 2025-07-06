@@ -103,15 +103,28 @@ const EmployeeManagement = () => {
     }
     setIsSubmitting(true);
 
-    const { error } = await supabase.functions.invoke("update-user", {
-      body: {
-        user_id: editingProfile.id,
-        full_name: fullName,
-        role,
-        password: password || undefined,
-        hourly_cost: parseFloat(hourlyCost) || 0,
-      },
-    });
+    const body: {
+      user_id: string;
+      full_name: string;
+      role: UserRole;
+      password?: string;
+      hourly_cost?: number;
+    } = {
+      user_id: editingProfile.id,
+      full_name: fullName,
+      role,
+    };
+
+    if (password) {
+      body.password = password;
+    }
+
+    const parsedHourlyCost = parseFloat(hourlyCost);
+    if (!isNaN(parsedHourlyCost)) {
+      body.hourly_cost = parsedHourlyCost;
+    }
+
+    const { error } = await supabase.functions.invoke("update-user", { body });
 
     setIsSubmitting(false);
     if (error) {
