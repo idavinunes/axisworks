@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Timer, Camera, ArrowLeft, Trash2 } from "lucide-react";
+import { PlusCircle, Timer, Camera, ArrowLeft, Trash2, MapPin } from "lucide-react";
 
 const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const [isTiming, setIsTiming] = useState(false);
@@ -210,7 +210,7 @@ const DemandDetails = () => {
     setLoading(true);
     const { data: demandData, error: demandError } = await supabase
       .from("demands")
-      .select("*")
+      .select("*, locations(*)")
       .eq("id", id)
       .single();
 
@@ -290,9 +290,15 @@ const DemandDetails = () => {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle className="text-2xl">{demand.title}</CardTitle>
-              <CardDescription>
-                Acompanhe o progresso das tarefas abaixo.
-              </CardDescription>
+              {demand.locations && (
+                <CardDescription className="flex items-start gap-2 pt-2 text-base">
+                  <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">{demand.locations.client_name}</p>
+                    <p className="text-muted-foreground">{demand.locations.address}</p>
+                  </div>
+                </CardDescription>
+              )}
             </div>
             <div className="text-right">
               <p className="font-bold text-lg">{formatTotalTime(totalDuration)}</p>

@@ -12,6 +12,14 @@ export interface Profile {
   role: UserRole;
 }
 
+export interface Location {
+  id: string;
+  user_id: string;
+  client_name: string;
+  address: string;
+  created_at: string;
+}
+
 export interface Demand {
   id: string;
   user_id: string;
@@ -19,6 +27,8 @@ export interface Demand {
   created_at: string;
   status: string;
   tasks?: Task[];
+  location_id: string | null;
+  locations: Location | null;
 }
 
 export interface Task {
