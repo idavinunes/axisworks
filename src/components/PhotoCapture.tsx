@@ -82,11 +82,12 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
             <video 
               ref={videoRef} 
               autoPlay 
-              playsInline 
-              className={`w-full h-auto transition-opacity ${capturedImage ? 'opacity-0' : 'opacity-100'}`}
+              playsInline
+              muted
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity ${capturedImage ? 'opacity-0' : 'opacity-100'}`}
             />
             {capturedImage && (
-              <img src={capturedImage} alt="Captured" className="absolute top-0 left-0 w-full h-full object-cover" />
+              <img src={capturedImage} alt="Captured" className="absolute inset-0 w-full h-full object-cover" />
             )}
           </>
         )}
