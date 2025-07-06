@@ -238,14 +238,34 @@ const DemandDetails = () => {
       if (!id) { setLoading(false); return; }
       setLoading(true);
       try {
-        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*), material_costs(*)").eq("id", id).single();
+        // Step 1: Fetch the main demand data and its related location
+        const { data: demandData, error: demandError } = await supabase
+          .from("demands")
+          .select("*, locations(*)")
+          .eq("id", id)
+          .single();
+
         if (demandError) throw demandError;
+        
         setDemand(demandData);
-        setMaterialCosts(demandData.material_costs || []);
         if (demandData?.start_date) {
           setNewStartDate(new Date(demandData.start_date + 'T00:00:00'));
         }
 
+        // Step 2: Fetch material costs in a separate query for robustness
+        const { data: costsData, error: costsError } = await supabase
+          .from("material_costs")
+          .select("*")
+          .eq("demand_id", id);
+
+        if (costsError) {
+          console.error("Could not fetch material costs, maybe the table wasn't created?", costsError);
+          setMaterialCosts([]); // Default to empty array on error
+        } else {
+          setMaterialCosts(costsData || []);
+        }
+
+        // Step 3: Fetch tasks
         const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*, profiles!left(*)").eq("demand_id", id).order("created_at", { ascending: true });
         if (tasksError) throw tasksError;
 
@@ -267,6 +287,7 @@ const DemandDetails = () => {
         setTasks(signedTasks);
 
       } catch (error) {
+        console.error("Error fetching demand details:", error);
         showError("Falha ao carregar detalhes da demanda.");
       } finally {
         setLoading(false);
