@@ -275,59 +275,60 @@ const LocationDetails = () => {
         </CardHeader>
         <CardContent>
           {demands.length > 0 ? (
-            <ul className="space-y-2">
+            <div className="grid gap-4">
               {demands.map((demand) => {
                 const totalSeconds = calculateTotalDuration(demand.tasks);
                 const formattedTime = formatTotalTime(totalSeconds);
                 return (
-                  <li key={demand.id} className="border p-3 rounded-md flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 hover:bg-accent">
-                    <Link to={`/demands/${demand.id}`} className="w-full flex-grow flex items-center gap-3">
-                      <p className="font-medium flex-grow">{demand.title}</p>
+                  <Card key={demand.id} className="flex flex-col">
+                    <CardHeader className="pb-4">
+                      <Link to={`/demands/${demand.id}`}>
+                        <CardTitle className="hover:underline">{demand.title}</CardTitle>
+                      </Link>
+                      <CardDescription>
+                        Início em: {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
                       {totalSeconds > 0 && (
-                        <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm flex-shrink-0">
-                          <Clock className="h-3 w-3" />
-                          {formattedTime}
-                        </span>
+                        <div className="flex items-center gap-2 text-sm font-mono text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{formattedTime}</span>
+                        </div>
                       )}
-                    </Link>
-                    <div className="w-full sm:w-auto flex items-center justify-end sm:justify-start flex-shrink-0 gap-2">
-                      <span className="text-xs text-muted-foreground mr-auto sm:mr-2">
-                        {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
-                      </span>
-                      {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => handleOpenAssignDialog(demand)}>
-                            <Users className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Atribuir</span>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
-                                  Deletar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </>
-                      )}
-                    </div>
-                  </li>
+                    </CardContent>
+                    {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+                      <CardFooter className="flex justify-between gap-2 pt-4 border-t">
+                        <Button variant="outline" className="flex-grow" onClick={() => handleOpenAssignDialog(demand)}>
+                          <Users className="mr-2 h-4 w-4" /> Atribuir
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon" className="flex-shrink-0">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
+                                Deletar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </CardFooter>
+                    )}
+                  </Card>
                 );
               })}
-            </ul>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">
               Nenhuma demanda cadastrada para este local.
