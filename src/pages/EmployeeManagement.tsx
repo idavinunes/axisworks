@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, UserRole } from "@/types";
-import { PlusCircle, UserCheck, Shield, User, ArrowLeft } from "lucide-react";
+import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
@@ -23,6 +23,7 @@ const EmployeeManagement = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
   // Form state
   const [fullName, setFullName] = useState("");
@@ -52,6 +53,34 @@ const EmployeeManagement = () => {
     setRole("user");
   };
 
+  const handleOpenAddDialog = () => {
+    setEditingProfile(null);
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (profile: Profile) => {
+    setEditingProfile(profile);
+    setFullName(profile.full_name);
+    setRole(profile.role);
+    setPassword(""); // Clear password for editing
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setEditingProfile(null);
+    resetForm();
+  };
+
+  const handleSubmit = () => {
+    if (editingProfile) {
+      handleUpdateUser();
+    } else {
+      handleCreateUser();
+    }
+  };
+
   const handleCreateUser = async () => {
     if (!fullName || !email || !password) {
       showError("Por favor, preencha todos os campos.");
@@ -60,12 +89,7 @@ const EmployeeManagement = () => {
     setIsLoading(true);
 
     const { error } = await supabase.functions.invoke("create-user", {
-      body: {
-        full_name: fullName,
-        email,
-        password,
-        role,
-      },
+      body: { full_name: fullName, email, password, role },
     });
 
     setIsLoading(false);
@@ -73,9 +97,34 @@ const EmployeeManagement = () => {
       showError(`Falha ao criar usuário: ${error.message}`);
     } else {
       showSuccess("Usuário criado com sucesso!");
-      setIsDialogOpen(false);
-      resetForm();
-      fetchProfiles(); // Refresh the list
+      handleDialogClose();
+      fetchProfiles();
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingProfile || !fullName) {
+      showError("O nome completo é obrigatório.");
+      return;
+    }
+    setIsLoading(true);
+
+    const { error } = await supabase.functions.invoke("update-user", {
+      body: {
+        user_id: editingProfile.id,
+        full_name: fullName,
+        role,
+        password: password || undefined,
+      },
+    });
+
+    setIsLoading(false);
+    if (error) {
+      showError(`Falha ao atualizar usuário: ${error.message}`);
+    } else {
+      showSuccess("Usuário atualizado com sucesso!");
+      handleDialogClose();
+      fetchProfiles();
     }
   };
 
@@ -90,64 +139,65 @@ const EmployeeManagement = () => {
 
   return (
     <div className="space-y-6">
-       <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+      <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
         <ArrowLeft className="h-4 w-4" />
         Voltar para o Início
       </Link>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Gerenciamento de Equipe</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Usuário
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Adicionar Novo Usuário</DialogTitle>
-              <DialogDescription>
-                Preencha os dados para cadastrar um novo membro na equipe.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Nome Completo</Label>
-                <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex: João da Silva" />
-              </div>
+        <Button onClick={handleOpenAddDialog}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Usuário
+        </Button>
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingProfile ? "Editar Usuário" : "Adicionar Novo Usuário"}</DialogTitle>
+            <DialogDescription>
+              {editingProfile ? "Atualize os dados do usuário." : "Preencha os dados para cadastrar um novo membro."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Nome Completo</Label>
+              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex: João da Silva" />
+            </div>
+            {!editingProfile && (
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao.silva@email.com" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Perfil</Label>
-                <Select onValueChange={(value: UserRole) => setRole(value)} defaultValue={role}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um perfil" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentUserProfile?.role === 'admin' && (
-                      <>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                        <SelectItem value="supervisor">Supervisor</SelectItem>
-                      </>
-                    )}
-                    <SelectItem value="user">Usuário</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingProfile ? "Deixe em branco para não alterar" : "••••••••"} />
             </div>
-            <DialogFooter>
-              <Button type="submit" onClick={handleCreateUser} disabled={isLoading}>
-                {isLoading ? "Salvando..." : "Salvar Usuário"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Perfil</Label>
+              <Select onValueChange={(value: UserRole) => setRole(value)} value={role}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um perfil" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currentUserProfile?.role === 'admin' && (
+                    <>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                    </>
+                  )}
+                  <SelectItem value="user">Usuário</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {profiles.length > 0 ? (
@@ -155,7 +205,14 @@ const EmployeeManagement = () => {
             <Card key={profile.id}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>{profile.full_name}</CardTitle>
-                {roleIcons[profile.role]}
+                <div className="flex items-center">
+                  {currentUserProfile?.role === 'admin' && (
+                    <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(profile)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {roleIcons[profile.role]}
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm font-medium text-muted-foreground capitalize">{profile.role}</p>
