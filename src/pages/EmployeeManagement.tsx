@@ -151,7 +151,7 @@ const EmployeeManagement = () => {
         Voltar para o Início
       </Link>
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Gerenciamento de Equipe</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Gerenciamento de Equipe</h1>
         <Button onClick={handleOpenAddDialog}>
           <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Usuário
         </Button>
@@ -178,7 +178,7 @@ const EmployeeManagement = () => {
               <Label htmlFor="password">Senha</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingProfile ? "Deixe em branco para não alterar" : "••••••••"} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role">Perfil</Label>
                 <Select onValueChange={(value: UserRole) => setRole(value)} value={role}>

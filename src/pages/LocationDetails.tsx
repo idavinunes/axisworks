@@ -220,7 +220,7 @@ const LocationDetails = () => {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div className="flex-grow">
-              <CardTitle className="text-2xl">{location.client_name}</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">{location.client_name}</CardTitle>
               <CardDescription className="flex items-center gap-2 pt-1">
                 <MapPin className="h-4 w-4" /> {formatAddress(location)}
               </CardDescription>
@@ -315,25 +315,25 @@ const LocationDetails = () => {
                 const totalSeconds = calculateTotalDuration(demand.tasks);
                 const formattedTime = formatTotalTime(totalSeconds);
                 return (
-                  <li key={demand.id} className="border p-3 rounded-md flex justify-between items-center hover:bg-accent">
-                    <Link to={`/demands/${demand.id}`} className="flex-grow mr-4 flex items-center gap-3">
-                      <p className="font-medium">{demand.title}</p>
+                  <li key={demand.id} className="border p-3 rounded-md flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 hover:bg-accent">
+                    <Link to={`/demands/${demand.id}`} className="w-full flex-grow flex items-center gap-3">
+                      <p className="font-medium flex-grow">{demand.title}</p>
                       {totalSeconds > 0 && (
-                        <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
+                        <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm flex-shrink-0">
                           <Clock className="h-3 w-3" />
                           {formattedTime}
                         </span>
                       )}
                     </Link>
-                    <div className="flex items-center flex-shrink-0 gap-1">
-                      <span className="text-xs text-muted-foreground mr-2">
+                    <div className="w-full sm:w-auto flex items-center justify-end sm:justify-start flex-shrink-0 gap-2">
+                      <span className="text-xs text-muted-foreground mr-auto sm:mr-2">
                         {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
                       </span>
                       {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
                         <>
                           <Button variant="outline" size="sm" onClick={() => handleOpenAssignDialog(demand)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Atribuir
+                            <Users className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Atribuir</span>
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

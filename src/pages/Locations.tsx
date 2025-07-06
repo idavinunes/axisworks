@@ -150,7 +150,7 @@ const Locations = () => {
         Voltar para o Início
       </Link>
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Locais de Trabalho</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Locais de Trabalho</h1>
         {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
           <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
             <DialogTrigger asChild>
@@ -164,8 +164,8 @@ const Locations = () => {
                 <DialogDescription>{isEditing ? "Atualize os dados do cliente e endereço." : "Preencha os dados do cliente e endereço."}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-1 sm:col-span-2">
                     <Label htmlFor="client_name">Nome do Cliente</Label>
                     <Input id="client_name" value={formData.client_name || ""} onChange={handleInputChange} />
                   </div>

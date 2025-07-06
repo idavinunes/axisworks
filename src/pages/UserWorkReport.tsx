@@ -69,7 +69,7 @@ const UserWorkReport = () => {
       </Link>
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Relatório de Horas</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Relatório de Horas</h1>
           <p className="text-muted-foreground">Desempenho da equipe no período selecionado.</p>
         </div>
         <Popover>

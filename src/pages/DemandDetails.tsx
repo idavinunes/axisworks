@@ -140,57 +140,59 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
 
   return (
     <div className="flex flex-col gap-2 p-3 border rounded-md">
-      <div className="flex items-center gap-4">
-        <div className="w-10 text-center flex justify-center items-center">
+      <div className="flex items-center gap-3">
+        <div className="w-10 text-center flex justify-center items-center flex-shrink-0">
           {renderStatus()}
         </div>
-        <span className="flex-grow font-medium">{task.title}</span>
-        <div className="flex items-center gap-2">
-          {task.status === 'pending' && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-block">
-                    <Button size="sm" onClick={() => { setPhotoAction('start'); setIsPhotoDialogOpen(true); }} disabled={!canStartTask}>
-                      <Camera className="mr-2 h-4 w-4" /> Iniciar
-                    </Button>
+        <div className="flex-grow flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <span className="font-medium break-words mr-2">{task.title}</span>
+          <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+            {task.status === 'pending' && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-block">
+                      <Button size="sm" onClick={() => { setPhotoAction('start'); setIsPhotoDialogOpen(true); }} disabled={!canStartTask}>
+                        <Camera className="mr-2 h-4 w-4" /> Iniciar
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {!canStartTask && <TooltipContent><p>A tarefa só pode ser iniciada na data agendada.</p></TooltipContent>}
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {task.status === 'in_progress' && (
+              <Button size="sm" variant="destructive" onClick={() => { setPhotoAction('end'); setIsPhotoDialogOpen(true); }}>
+                <Camera className="mr-2 h-4 w-4" /> Finalizar
+              </Button>
+            )}
+            {task.status === 'pending_approval' && (profile?.role === 'admin' || profile?.role === 'supervisor') && (
+              <Button size="sm" variant="default" onClick={handleApproveTask} className="bg-green-600 hover:bg-green-700">
+                <CheckCircle2 className="mr-2 h-4 w-4" /> Aprovar
+              </Button>
+            )}
+            {(task.signed_start_photo_url || task.signed_end_photo_url) && (
+              <Dialog open={isViewingPhotos} onOpenChange={setIsViewingPhotos}>
+                <DialogTrigger asChild><Button variant="outline" size="icon"><ImageIcon className="h-4 w-4" /></Button></DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle></DialogHeader>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {task.signed_start_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Início</h3><img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" /></div>)}
+                    {task.signed_end_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Fim</h3><img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" /></div>)}
                   </div>
-                </TooltipTrigger>
-                {!canStartTask && <TooltipContent><p>A tarefa só pode ser iniciada na data agendada.</p></TooltipContent>}
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          {task.status === 'in_progress' && (
-            <Button size="sm" variant="destructive" onClick={() => { setPhotoAction('end'); setIsPhotoDialogOpen(true); }}>
-              <Camera className="mr-2 h-4 w-4" /> Finalizar
-            </Button>
-          )}
-          {task.status === 'pending_approval' && (profile?.role === 'admin' || profile?.role === 'supervisor') && (
-            <Button size="sm" variant="default" onClick={handleApproveTask} className="bg-green-600 hover:bg-green-700">
-              <CheckCircle2 className="mr-2 h-4 w-4" /> Aprovar
-            </Button>
-          )}
-          {(task.signed_start_photo_url || task.signed_end_photo_url) && (
-            <Dialog open={isViewingPhotos} onOpenChange={setIsViewingPhotos}>
-              <DialogTrigger asChild><Button variant="outline" size="icon"><ImageIcon className="h-4 w-4" /></Button></DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle></DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {task.signed_start_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Início</h3><img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" /></div>)}
-                  {task.signed_end_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Fim</h3><img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" /></div>)}
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-          {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita e irá deletar a tarefa "{task.title}".</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction></AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                </DialogContent>
+              </Dialog>
+            )}
+            {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita e irá deletar a tarefa "{task.title}".</AlertDialogDescription></AlertDialogHeader>
+                  <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       </div>
       {task.profiles && (
@@ -321,22 +323,22 @@ const DemandDetails = () => {
       )}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
-              <CardTitle className="text-2xl">{demand.title}</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl">{demand.title}</CardTitle>
               {demand.locations && (
                 <CardDescription className="flex items-center gap-2 pt-1">
                   <MapPin className="h-4 w-4" /> {formatAddress(demand.locations)}
                 </CardDescription>
               )}
             </div>
-            <div className="text-right flex-shrink-0 space-y-1">
-              <div className="flex items-center justify-end gap-2">
+            <div className="text-left sm:text-right flex-shrink-0 space-y-1">
+              <div className="flex items-center sm:justify-end gap-2">
                 <p className="font-bold text-lg">{formatTotalTime(totalSeconds)}</p>
                 <Clock className="h-5 w-5 text-muted-foreground" />
               </div>
               {totalCost > 0 && (
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center sm:justify-end gap-2">
                   <p className="font-bold text-lg text-green-600">$ {totalCost.toFixed(2)}</p>
                   <DollarSign className="h-5 w-5 text-muted-foreground" />
                 </div>

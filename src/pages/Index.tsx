@@ -148,7 +148,7 @@ const Index = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Painel de Controle</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold">Painel de Controle</h1>
       
       {loading ? renderSkeletons() : error ? (
         <p className="text-red-500">{error}</p>
