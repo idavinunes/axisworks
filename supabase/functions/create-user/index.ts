@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, full_name, role } = await req.json();
+    const { email, password, full_name, role, hourly_cost } = await req.json();
     if (!email || !password || !full_name || !role) {
       throw new Error("Email, senha, nome completo e perfil são obrigatórios.");
     }
@@ -26,7 +26,7 @@ serve(async (req) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // O usuário não precisará confirmar o e-mail
+      email_confirm: true,
       user_metadata: { full_name },
     });
 
@@ -39,19 +39,19 @@ serve(async (req) => {
       throw new Error("A criação do usuário não retornou um usuário válido.");
     }
 
-    // 2. O trigger 'handle_new_user' já criou o perfil com o nome completo e o role padrão ('user').
-    //    Agora, se o role for diferente de 'user', atualizamos o perfil.
-    if (role !== 'user') {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .update({ role: role })
-        .eq('id', newUser.id);
+    // 2. O trigger 'handle_new_user' já criou o perfil. Agora, atualizamos com o role e o custo.
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .update({ 
+        role: role,
+        hourly_cost: hourly_cost || 0
+      })
+      .eq('id', newUser.id);
 
-      if (profileError) {
-        // Se a atualização do perfil falhar, é uma boa prática deletar o usuário recém-criado para evitar inconsistências.
-        await supabaseAdmin.auth.admin.deleteUser(newUser.id);
-        throw new Error(`Erro ao definir o perfil do usuário: ${profileError.message}`);
-      }
+    if (profileError) {
+      // Se a atualização do perfil falhar, deletamos o usuário recém-criado.
+      await supabaseAdmin.auth.admin.deleteUser(newUser.id);
+      throw new Error(`Erro ao definir o perfil do usuário: ${profileError.message}`);
     }
 
     return new Response(JSON.stringify({ message: "Usuário criado com sucesso!", user: newUser }), {

@@ -12,8 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    // Somente um admin pode chamar esta função, o que é garantido pela lógica no frontend.
-    const { user_id, full_name, role, password } = await req.json();
+    const { user_id, full_name, role, password, hourly_cost } = await req.json();
     if (!user_id || !full_name || !role) {
       throw new Error("ID do usuário, nome completo e perfil são obrigatórios.");
     }
@@ -23,7 +22,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1. Atualiza os dados de autenticação (senha e metadados)
+    // 1. Atualiza os dados de autenticação
     const authUpdatePayload: { password?: string; user_metadata?: { full_name: string } } = {
         user_metadata: { full_name }
     };
@@ -40,10 +39,14 @@ serve(async (req) => {
       throw new Error(`Erro ao atualizar dados de autenticação: ${authError.message}`);
     }
 
-    // 2. Atualiza o perfil público (nome e perfil/role)
+    // 2. Atualiza o perfil público
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({ full_name, role })
+      .update({ 
+        full_name, 
+        role,
+        hourly_cost: hourly_cost || 0
+      })
       .eq('id', user_id);
 
     if (profileError) {

@@ -6,6 +6,7 @@ export interface Profile {
   role: UserRole;
   email: string;
   is_confirmed: boolean;
+  hourly_cost?: number;
 }
 
 export interface Location {
@@ -47,4 +48,6 @@ export interface Task {
   signed_start_photo_url?: string;
   signed_end_photo_url?: string;
   presumed_hours: number | null;
+  worker_id: string | null;
+  profiles?: Profile | null; // Para o JOIN com os dados do trabalhador
 }

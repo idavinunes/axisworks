@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, UserRole } from "@/types";
-import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil } from "lucide-react";
+import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
@@ -32,6 +32,7 @@ const EmployeeManagement = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("user");
+  const [hourlyCost, setHourlyCost] = useState("");
 
   const fetchProfiles = async () => {
     const { data, error } = await supabase.functions.invoke("get-users-with-status");
@@ -53,6 +54,7 @@ const EmployeeManagement = () => {
     setEmail("");
     setPassword("");
     setRole("user");
+    setHourlyCost("");
   };
 
   const handleOpenAddDialog = () => {
@@ -66,7 +68,8 @@ const EmployeeManagement = () => {
     setFullName(profile.full_name);
     setEmail(profile.email);
     setRole(profile.role);
-    setPassword(""); // Clear password for editing
+    setHourlyCost(profile.hourly_cost?.toString() || "0");
+    setPassword("");
     setIsDialogOpen(true);
   };
 
@@ -86,13 +89,13 @@ const EmployeeManagement = () => {
 
   const handleCreateUser = async () => {
     if (!fullName || !email || !password) {
-      showError("Por favor, preencha todos os campos.");
+      showError("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
     setIsLoading(true);
 
     const { error } = await supabase.functions.invoke("create-user", {
-      body: { full_name: fullName, email, password, role },
+      body: { full_name: fullName, email, password, role, hourly_cost: parseFloat(hourlyCost) || 0 },
     });
 
     setIsLoading(false);
@@ -118,6 +121,7 @@ const EmployeeManagement = () => {
         full_name: fullName,
         role,
         password: password || undefined,
+        hourly_cost: parseFloat(hourlyCost) || 0,
       },
     });
 
@@ -174,22 +178,28 @@ const EmployeeManagement = () => {
               <Label htmlFor="password">Senha</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingProfile ? "Deixe em branco para não alterar" : "••••••••"} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Perfil</Label>
-              <Select onValueChange={(value: UserRole) => setRole(value)} value={role}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um perfil" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currentUserProfile?.role === 'admin' && (
-                    <>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
-                    </>
-                  )}
-                  <SelectItem value="user">Usuário</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">Perfil</Label>
+                <Select onValueChange={(value: UserRole) => setRole(value)} value={role}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um perfil" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currentUserProfile?.role === 'admin' && (
+                      <>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="supervisor">Supervisor</SelectItem>
+                      </>
+                    )}
+                    <SelectItem value="user">Usuário</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hourlyCost">Custo/Hora (R$)</Label>
+                <Input id="hourlyCost" type="number" value={hourlyCost} onChange={(e) => setHourlyCost(e.target.value)} placeholder="Ex: 25.50" />
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -232,6 +242,12 @@ const EmployeeManagement = () => {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+                 {profile.hourly_cost && profile.hourly_cost > 0 && (
+                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                    <DollarSign className="h-4 w-4" />
+                    <span>{`R$ ${profile.hourly_cost.toFixed(2).replace('.', ',')} / hora`}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
