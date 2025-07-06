@@ -11,11 +11,23 @@ interface PhotoCaptureProps {
 const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      setIsCameraReady(false);
+    }
+  }, []);
 
   const startCamera = useCallback(async () => {
+    stopCamera(); // Garante que qualquer câmera anterior seja parada
+    setCapturedImage(null);
+    
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user' } 
@@ -23,23 +35,17 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      setStream(mediaStream);
-      setCapturedImage(null);
+      streamRef.current = mediaStream;
       setError(null);
+      setIsCameraReady(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
       const errorMessage = "Não foi possível acessar a câmera. Verifique as permissões no seu navegador.";
       setError(errorMessage);
       showError(errorMessage);
+      setIsCameraReady(false);
     }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  }, [stream]);
+  }, [stopCamera]);
 
   useEffect(() => {
     startCamera();
@@ -49,7 +55,7 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
   }, [startCamera, stopCamera]);
 
   const handleTakePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
+    if (videoRef.current && canvasRef.current && streamRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
@@ -108,7 +114,7 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
             <Button onClick={onCancel} variant="outline">
               <X className="mr-2 h-4 w-4" /> Cancelar
             </Button>
-            <Button onClick={handleTakePhoto} disabled={!stream || !!error}>
+            <Button onClick={handleTakePhoto} disabled={!isCameraReady || !!error}>
               <Camera className="mr-2 h-4 w-4" /> Tirar Foto
             </Button>
           </>
