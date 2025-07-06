@@ -111,19 +111,21 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         const presumedSeconds = task.presumed_hours * 3600;
         const differenceSeconds = actualDurationSeconds - presumedSeconds;
         let message = "";
+        let messageColor = "";
 
-        if (differenceSeconds > 300) { // Took longer
+        if (differenceSeconds > 300) { // Took longer (bad)
           statusColor = "text-red-600";
+          messageColor = "text-red-600 font-semibold";
           message = `(+${formatTotalTime(differenceSeconds)})`;
-        } else if (differenceSeconds < -300) { // Finished earlier
-          statusColor = "text-red-600";
+        } else if (differenceSeconds < -300) { // Finished earlier (good)
+          messageColor = "text-green-600 font-semibold";
           message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
         }
         
         comparisonElement = (
           <div className="text-xs mt-1">
               <span>Prev: {task.presumed_hours}h</span>
-              {message && <span className="ml-1 font-semibold">{message}</span>}
+              {message && <span className={`ml-1 ${messageColor}`}>{message}</span>}
           </div>
         );
       }
