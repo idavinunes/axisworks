@@ -110,14 +110,16 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
       if (task.presumed_hours !== null && task.presumed_hours !== undefined) {
         const presumedSeconds = task.presumed_hours * 3600;
         const differenceSeconds = actualDurationSeconds - presumedSeconds;
+        const toleranceSeconds = presumedSeconds * 0.15; // 15% tolerance
+
         let message = "";
         let messageColor = "";
 
-        if (differenceSeconds > 300) { // Took longer (bad)
+        if (differenceSeconds > toleranceSeconds) { // Took more than 15% longer (bad)
           statusColor = "text-red-600";
           messageColor = "text-red-600 font-semibold";
           message = `(+${formatTotalTime(differenceSeconds)})`;
-        } else if (differenceSeconds < -300) { // Finished earlier (good)
+        } else if (differenceSeconds < 0) { // Finished earlier (good)
           messageColor = "text-green-600 font-semibold";
           message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
         }
@@ -374,7 +376,7 @@ const DemandDetails = () => {
                   <DialogDescription>
                     Preencha os detalhes da nova tarefa.
                   </DialogDescription>
-                </DialogHeader>
+                </Header>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="task-title">Título da Tarefa</Label>
