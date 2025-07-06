@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
 import { PlusCircle, Timer, Camera, ArrowLeft, Trash2 } from "lucide-react";
 
@@ -51,6 +52,10 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
       showError("Pare o cronômetro antes de completar a tarefa.");
       return;
     }
+    if (!task.is_completed && !task.photo_url) {
+      showError("É necessário adicionar uma foto antes de concluir a tarefa.");
+      return;
+    }
     const { error } = await supabase.from('tasks').update({ is_completed: !task.is_completed }).eq('id', task.id);
     if (error) showError("Erro ao atualizar tarefa.");
     else onUpdate();
@@ -64,7 +69,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
     const { data, error: uploadError } = await supabase.storage.from('task-photos').upload(fileName, blob);
 
     if (uploadError) {
-      showError("Falha ao enviar foto.");
+      showError("Falha ao enviar foto. Verifique se o bucket 'task-photos' existe e é público.");
       console.error(uploadError);
       return;
     }
@@ -82,6 +87,31 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
     setIsPhotoDialogOpen(false);
   };
 
+  const handleDeleteTask = async () => {
+    // 1. Delete from storage
+    if (task.photo_url) {
+      const { data: listData, error: listError } = await supabase.storage
+        .from('task-photos')
+        .list(task.id, { limit: 100 });
+
+      if (listError) {
+        showError("Erro ao listar fotos para deletar.");
+      } else if (listData && listData.length > 0) {
+        const filesToRemove = listData.map((file) => `${task.id}/${file.name}`);
+        await supabase.storage.from('task-photos').remove(filesToRemove);
+      }
+    }
+
+    // 2. Delete from database
+    const { error: dbError } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (dbError) {
+      showError("Erro ao deletar tarefa.");
+    } else {
+      showSuccess("Tarefa deletada com sucesso.");
+      onUpdate();
+    }
+  };
+
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -90,12 +120,12 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   };
 
   return (
-    <div className="flex items-center gap-4 p-3 border rounded-md">
+    <div className="flex items-center gap-2 p-3 border rounded-md">
       <Checkbox id={`task-${task.id}`} checked={task.is_completed} onCheckedChange={handleToggleComplete} />
       <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>
         {task.title}
       </label>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
         <span className="text-sm font-mono w-24 text-center">{formatTime(elapsedTime)}</span>
         <Button variant={isTiming ? "destructive" : "outline"} size="sm" onClick={handleToggleTiming} disabled={task.is_completed}>
           <Timer className="mr-2 h-4 w-4" /> {isTiming ? "Parar" : "Iniciar"}
@@ -103,17 +133,38 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" disabled={task.is_completed}>
-              <Camera className="mr-2 h-4 w-4" /> {task.photo_url ? "Ver/Trocar Foto" : "Tirar Foto"}
+              <Camera className="mr-2 h-4 w-4" /> {task.photo_url ? "Ver/Trocar" : "Foto"}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Foto da Tarefa: {task.title}</DialogTitle>
             </DialogHeader>
-            {task.photo_url && <img src={task.photo_url} alt="Foto da tarefa" className="my-4 rounded-lg" />}
+            {task.photo_url && <img src={task.photo_url} alt="Foto da tarefa" className="my-4 rounded-lg max-h-60 w-auto mx-auto" />}
             <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
           </DialogContent>
         </Dialog>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação não pode ser desfeita. Isso irá deletar permanentemente a tarefa e suas fotos associadas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">
+                Deletar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -128,6 +179,7 @@ const DemandDetails = () => {
 
   const fetchData = async () => {
     if (!id) return;
+    setLoading(true);
     const { data: demandData, error: demandError } = await supabase
       .from("demands")
       .select("*")
@@ -150,7 +202,7 @@ const DemandDetails = () => {
     if (tasksError) {
       showError("Erro ao buscar tarefas.");
     } else {
-      setTasks(tasksData);
+      setTasks(tasksData || []);
     }
     setLoading(false);
   };
@@ -180,8 +232,8 @@ const DemandDetails = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  if (loading) return <div>Carregando...</div>;
-  if (!demand) return <div>Demanda não encontrada.</div>;
+  if (loading) return <div className="p-4 text-center">Carregando...</div>;
+  if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
 
   return (
     <div className="space-y-6">
