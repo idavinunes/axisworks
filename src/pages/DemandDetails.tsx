@@ -192,56 +192,59 @@ const DemandDetails = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    try {
-      const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
-
-      if (demandError) throw demandError;
-      setDemand(demandData);
-
-      const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
-
-      if (tasksError) throw tasksError;
-
-      if (tasksData) {
-        const tasksWithSignedUrls = await Promise.all(
-          tasksData.map(async (task) => {
-            const signedUrls: Partial<Task> = {};
-            if (task.start_photo_url) {
-              const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
-              if (error) console.error("Error creating signed URL for start photo:", error.message);
-              else signedUrls.signed_start_photo_url = data.signedUrl;
-            }
-            if (task.end_photo_url) {
-              const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
-              if (error) console.error("Error creating signed URL for end photo:", error.message);
-              else signedUrls.signed_end_photo_url = data.signedUrl;
-            }
-            return { ...task, ...signedUrls };
-          })
-        );
-        setTasks(tasksWithSignedUrls);
-      } else {
-        setTasks([]);
-      }
-    } catch (error) {
-      console.error("Error fetching demand details:", error);
-      showError("Falha ao carregar detalhes da demanda.");
-      setDemand(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const forceRefresh = () => setRefreshKey(k => k + 1);
 
   useEffect(() => {
-    setLoading(true);
+    const fetchData = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
+
+        if (demandError) throw demandError;
+        setDemand(demandData);
+
+        const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
+
+        if (tasksError) throw tasksError;
+
+        if (tasksData) {
+          const tasksWithSignedUrls = await Promise.all(
+            tasksData.map(async (task) => {
+              const signedUrls: Partial<Task> = {};
+              if (task.start_photo_url) {
+                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
+                if (error) console.error("Error creating signed URL for start photo:", error.message);
+                else signedUrls.signed_start_photo_url = data.signedUrl;
+              }
+              if (task.end_photo_url) {
+                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
+                if (error) console.error("Error creating signed URL for end photo:", error.message);
+                else signedUrls.signed_end_photo_url = data.signedUrl;
+              }
+              return { ...task, ...signedUrls };
+            })
+          );
+          setTasks(tasksWithSignedUrls);
+        } else {
+          setTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching demand details:", error);
+        showError("Falha ao carregar detalhes da demanda.");
+        setDemand(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
-  }, [fetchData]);
+  }, [id, refreshKey]);
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim() || !id) return;
@@ -250,7 +253,7 @@ const DemandDetails = () => {
       showError("Erro ao adicionar tarefa.");
     } else {
       setNewTaskTitle("");
-      await fetchData();
+      forceRefresh();
     }
   };
 
@@ -269,7 +272,8 @@ const DemandDetails = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const formatAddress = (loc: Location) => {
+  const formatAddress = (loc: Location | null) => {
+    if (!loc) return "Endereço não disponível";
     return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
   };
 
@@ -325,7 +329,7 @@ const DemandDetails = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={fetchData} />
+              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} />
             ))}
           </div>
           <div className="flex gap-2 pt-4">
