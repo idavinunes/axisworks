@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, ArrowLeft, Trash2, MapPin, Map } from "lucide-react";
+import { PlusCircle, ArrowLeft, Trash2, MapPin, Map, Clock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
+import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +28,7 @@ const LocationDetails = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("locations")
-      .select("*, demands(*, locations(*))")
+      .select("*, demands(*, tasks(*))")
       .eq("id", id)
       .single();
 
@@ -149,39 +150,49 @@ const LocationDetails = () => {
         <CardContent>
           {demands.length > 0 ? (
             <ul className="space-y-2">
-              {demands.map((demand) => (
-                <li key={demand.id} className="border p-3 rounded-md flex justify-between items-center hover:bg-accent">
-                  <Link to={`/demands/${demand.id}`} className="flex-grow mr-4">
-                    <p>{demand.title}</p>
-                  </Link>
-                  <div className="flex items-center flex-shrink-0">
-                    <span className="text-xs text-muted-foreground mr-2">
-                      {new Date(demand.created_at).toLocaleDateString()}
-                    </span>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
-                            Deletar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </li>
-              ))}
+              {demands.map((demand) => {
+                const totalSeconds = calculateTotalDuration(demand.tasks);
+                const formattedTime = formatTotalTime(totalSeconds);
+                return (
+                  <li key={demand.id} className="border p-3 rounded-md flex justify-between items-center hover:bg-accent">
+                    <Link to={`/demands/${demand.id}`} className="flex-grow mr-4 flex items-center gap-3">
+                      <p className="font-medium">{demand.title}</p>
+                      {totalSeconds > 0 && (
+                        <span className="flex items-center gap-1 text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm">
+                          <Clock className="h-3 w-3" />
+                          {formattedTime}
+                        </span>
+                      )}
+                    </Link>
+                    <div className="flex items-center flex-shrink-0">
+                      <span className="text-xs text-muted-foreground mr-2">
+                        {new Date(demand.created_at).toLocaleDateString()}
+                      </span>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
+                              Deletar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-4">

@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Demand, Task, Location } from "@/types";
+import { Demand, Task } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
+import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 
 const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
@@ -258,23 +259,10 @@ const DemandDetails = () => {
     }
   };
 
-  const totalDuration = tasks.reduce((acc, task) => {
-    if (task.started_at && task.completed_at) {
-      const start = new Date(task.started_at).getTime();
-      const end = new Date(task.completed_at).getTime();
-      return acc + Math.floor((end - start) / 1000);
-    }
-    return acc;
-  }, 0);
-
-  const formatTotalTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
-
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada ou erro ao carregar.</div>;
+
+  const totalSeconds = calculateTotalDuration(tasks);
 
   return (
     <div className="space-y-6">
@@ -312,7 +300,7 @@ const DemandDetails = () => {
               )}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="font-bold text-lg">{formatTotalTime(totalDuration)}</p>
+              <p className="font-bold text-lg">{formatTotalTime(totalSeconds)}</p>
               <p className="text-sm text-muted-foreground">Tempo Total</p>
             </div>
           </div>
