@@ -16,8 +16,14 @@ export interface Location {
   id: string;
   user_id: string;
   client_name: string;
-  address: string;
+  street_number: string;
+  street_name: string;
+  unit_number?: string | null;
+  city: string;
+  state: string;
+  zip_code: string;
   created_at: string;
+  demands?: Demand[];
 }
 
 export interface Demand {
@@ -28,7 +34,7 @@ export interface Demand {
   status: string;
   tasks?: Task[];
   location_id: string | null;
-  locations: Location | null;
+  locations: Location | null; // This can be simplified later if not needed
 }
 
 export interface Task {
@@ -39,5 +45,5 @@ export interface Task {
   duration_seconds: number;
   photo_url: string | null;
   created_at: string;
-  signed_photo_url?: string; // Adicionando a URL segura e temporária
+  signed_photo_url?: string;
 }

@@ -276,14 +276,19 @@ const DemandDetails = () => {
     return `${hours}h ${minutes}m`;
   };
 
+  const formatAddress = (loc: any) => {
+    if (!loc) return "";
+    return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
+  };
+
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+      <Link to={`/locations/${demand.location_id}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
         <ArrowLeft className="h-4 w-4" />
-        Voltar para Todas as Demandas
+        Voltar para {demand.locations?.client_name || 'Local'}
       </Link>
       <Card>
         <CardHeader>
@@ -295,7 +300,7 @@ const DemandDetails = () => {
                   <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-semibold">{demand.locations.client_name}</p>
-                    <p className="text-muted-foreground">{demand.locations.address}</p>
+                    <p className="text-muted-foreground">{formatAddress(demand.locations)}</p>
                   </div>
                 </CardDescription>
               )}

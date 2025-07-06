@@ -12,6 +12,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import DemandDetails from "./pages/DemandDetails";
 import Locations from "./pages/Locations";
+import LocationDetails from "./pages/LocationDetails";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/employees" element={<EmployeeManagement />} />
                 <Route path="/locations" element={<Locations />} />
+                <Route path="/locations/:id" element={<LocationDetails />} />
                 <Route path="/demands/:id" element={<DemandDetails />} />
               </Route>
             </Route>
