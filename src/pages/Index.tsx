@@ -8,8 +8,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Users, Play, Pause, StopCircle, Clock } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
+import PhotoCapture from "@/components/PhotoCapture";
+import { showSuccess } from "@/utils/toast";
 
 type WorkStatus = "idle" | "working" | "paused";
 
@@ -20,6 +29,8 @@ const Index = () => {
   const [pausedTime, setPausedTime] = useState<number>(0);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [startPhoto, setStartPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "working") {
@@ -38,11 +49,16 @@ const Index = () => {
     };
   }, [status, startTime, pausedTime]);
 
-  const handleStart = () => {
+  const handleStart = (photoDataUrl: string) => {
+    setStartPhoto(photoDataUrl);
     setStartTime(Date.now());
     setStatus("working");
     setElapsedTime(0);
     setPausedTime(0);
+    setIsPhotoDialogOpen(false);
+    showSuccess("Jornada iniciada com sucesso!");
+    // No futuro, aqui salvaremos a foto e o horário no Supabase
+    console.log("Foto de início capturada:", photoDataUrl.substring(0, 30) + "...");
   };
 
   const handlePause = () => {
@@ -65,6 +81,7 @@ const Index = () => {
     setElapsedTime(0);
     setStartTime(null);
     setPausedTime(0);
+    setStartPhoto(null);
   };
 
   const formatTime = (ms: number) => {
@@ -96,9 +113,22 @@ const Index = () => {
           </div>
           <div className="flex justify-center gap-4">
             {status === "idle" && (
-              <Button size="lg" onClick={handleStart}>
-                <Play className="mr-2 h-5 w-5" /> Iniciar Jornada
-              </Button>
+              <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg">
+                    <Play className="mr-2 h-5 w-5" /> Iniciar Jornada
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Registro de Ponto</DialogTitle>
+                  </DialogHeader>
+                  <PhotoCapture 
+                    onPhotoTaken={handleStart}
+                    onCancel={() => setIsPhotoDialogOpen(false)}
+                  />
+                </DialogContent>
+              </Dialog>
             )}
             {status === "working" && (
               <>
@@ -123,6 +153,17 @@ const Index = () => {
           </div>
         </CardContent>
       </Card>
+
+      {startPhoto && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Foto de Início</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <img src={startPhoto} alt="Início da jornada" className="rounded-lg max-w-xs mx-auto" />
+          </CardContent>
+        </Card>
+      )}
 
       {profile?.role === "admin" && (
         <Card>
