@@ -5,8 +5,9 @@ import { Demand, Task } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
 import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon } from "lucide-react";
@@ -85,7 +86,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   };
 
   const calculateDuration = () => {
-    if (!task.started_at || !task.completed_at) return "Em andamento";
+    if (!task.started_at || !task.completed_at) return { formatted: "Em andamento", seconds: 0 };
     const start = new Date(task.started_at).getTime();
     const end = new Date(task.completed_at).getTime();
     const diffSeconds = Math.floor((end - start) / 1000);
@@ -93,7 +94,37 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
     const hours = Math.floor(diffSeconds / 3600);
     const minutes = Math.floor((diffSeconds % 3600) / 60);
     const seconds = diffSeconds % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return {
+        formatted: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+        seconds: diffSeconds
+    };
+  };
+
+  const { formatted: formattedDuration, seconds: actualDurationSeconds } = calculateDuration();
+
+  const renderDurationComparison = () => {
+    if (!task.is_completed || task.presumed_hours === null || task.presumed_hours === undefined) return null;
+
+    const presumedSeconds = task.presumed_hours * 3600;
+    const differenceSeconds = actualDurationSeconds - presumedSeconds;
+    
+    let color = "text-muted-foreground";
+    let message = "";
+
+    if (differenceSeconds > 300) { // 5 minutes tolerance
+        color = "text-orange-500 font-semibold"; // Exceeded
+        message = `(+${formatTotalTime(differenceSeconds)})`;
+    } else if (differenceSeconds < -300) { // 5 minutes tolerance
+        color = "text-green-600 font-semibold"; // Less time
+        message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
+    }
+
+    return (
+        <div className={`text-xs mt-1`}>
+            <span>Prev: {task.presumed_hours}h</span>
+            {message && <span className={`ml-1 ${color}`}>{message}</span>}
+        </div>
+    );
   };
 
   const renderStatus = () => {
@@ -102,7 +133,8 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         <div className="flex flex-col items-center text-green-600">
           <CheckCircle2 className="h-5 w-5" />
           <span className="text-xs font-semibold">Concluída</span>
-          <span className="text-xs font-mono">{calculateDuration()}</span>
+          <span className="text-xs font-mono">{formattedDuration}</span>
+          {renderDurationComparison()}
         </div>
       );
     }
@@ -124,7 +156,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
 
   return (
     <div className="flex items-center gap-4 p-3 border rounded-md">
-      <div className="w-20 text-center">{renderStatus()}</div>
+      <div className="w-24 text-center">{renderStatus()}</div>
       <span className="flex-grow font-medium">{task.title}</span>
       <div className="flex items-center gap-2">
         {!task.started_at && (
@@ -193,6 +225,8 @@ const DemandDetails = () => {
   const [demand, setDemand] = useState<Demand | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newPresumedHours, setNewPresumedHours] = useState("");
+  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -249,12 +283,29 @@ const DemandDetails = () => {
   }, [id, refreshKey]);
 
   const handleAddTask = async () => {
-    if (!newTaskTitle.trim() || !id) return;
-    const { error } = await supabase.from("tasks").insert({ demand_id: id, title: newTaskTitle });
+    if (!newTaskTitle.trim() || !id) {
+      showError("O título da tarefa é obrigatório.");
+      return;
+    }
+    const presumedHoursValue = newPresumedHours ? parseFloat(newPresumedHours) : null;
+    if (newPresumedHours && (isNaN(presumedHoursValue) || presumedHoursValue < 0)) {
+        showError("Horas presumidas deve ser um número válido.");
+        return;
+    }
+
+    const { error } = await supabase.from("tasks").insert({ 
+        demand_id: id, 
+        title: newTaskTitle,
+        presumed_hours: presumedHoursValue
+    });
+
     if (error) {
       showError("Erro ao adicionar tarefa.");
     } else {
+      showSuccess("Tarefa adicionada com sucesso!");
       setNewTaskTitle("");
+      setNewPresumedHours("");
+      setIsAddTaskDialogOpen(false);
       forceRefresh();
     }
   };
@@ -311,9 +362,39 @@ const DemandDetails = () => {
               <TaskItem key={task.id} task={task} onUpdate={forceRefresh} />
             ))}
           </div>
-          <div className="flex gap-2 pt-4">
-            <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Digite o nome da nova tarefa" onKeyDown={(e) => e.key === 'Enter' && handleAddTask()} />
-            <Button onClick={handleAddTask}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button>
+          <div className="flex justify-end gap-2 pt-4">
+            <Dialog open={isAddTaskDialogOpen} onOpenChange={setIsAddTaskDialogOpen}>
+              <DialogTrigger asChild>
+                <Button><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
+                  <DialogDescription>
+                    Preencha os detalhes da nova tarefa.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="task-title">Título da Tarefa</Label>
+                    <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Limpar a área externa" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="presumed-hours">Horas Presumidas (Opcional)</Label>
+                    <Input 
+                      id="presumed-hours" 
+                      type="number" 
+                      value={newPresumedHours} 
+                      onChange={(e) => setNewPresumedHours(e.target.value)}
+                      placeholder="Ex: 1.5 (para 1h 30m)"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddTask}>Salvar Tarefa</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>

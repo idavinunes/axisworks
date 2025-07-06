@@ -49,4 +49,5 @@ export interface Task {
   created_at: string;
   signed_start_photo_url?: string;
   signed_end_photo_url?: string;
+  presumed_hours: number | null;
 }
