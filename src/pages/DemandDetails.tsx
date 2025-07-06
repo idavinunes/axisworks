@@ -18,6 +18,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [isTakingNewPhoto, setIsTakingNewPhoto] = useState(false);
 
   useEffect(() => {
     if (isTiming) {
@@ -82,7 +83,6 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
       showSuccess("Foto salva com sucesso!");
       onUpdate();
     }
-    setIsPhotoDialogOpen(false);
   };
 
   const handleDeleteTask = async () => {
@@ -128,7 +128,12 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         <Button variant={isTiming ? "destructive" : "outline"} size="sm" onClick={handleToggleTiming} disabled={task.is_completed}>
           <Timer className="mr-2 h-4 w-4" /> {isTiming ? "Parar" : "Iniciar"}
         </Button>
-        <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <Dialog open={isPhotoDialogOpen} onOpenChange={(open) => {
+          setIsPhotoDialogOpen(open);
+          if (!open) {
+            setIsTakingNewPhoto(false);
+          }
+        }}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" disabled={task.is_completed}>
               <Camera className="mr-2 h-4 w-4" /> {task.photo_url ? "Ver/Trocar" : "Foto"}
@@ -138,8 +143,33 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
             <DialogHeader>
               <DialogTitle>Foto da Tarefa: {task.title}</DialogTitle>
             </DialogHeader>
-            {task.signed_photo_url && <img src={task.signed_photo_url} alt="Foto da tarefa" className="my-4 rounded-lg max-h-60 w-auto mx-auto" />}
-            <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
+            {isTakingNewPhoto ? (
+              <PhotoCapture 
+                onPhotoTaken={async (dataUrl) => {
+                  await handlePhotoTaken(dataUrl);
+                  setIsTakingNewPhoto(false);
+                }} 
+                onCancel={() => setIsTakingNewPhoto(false)} 
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-4 pt-4">
+                {task.signed_photo_url ? (
+                  <img src={task.signed_photo_url} alt="Foto da tarefa" className="rounded-lg max-h-80 w-auto mx-auto" />
+                ) : (
+                  <div className="my-4 p-8 text-center text-muted-foreground bg-muted rounded-lg w-full">
+                    <Camera className="mx-auto h-12 w-12 mb-2" />
+                    Nenhuma foto foi tirada para esta tarefa ainda.
+                  </div>
+                )}
+                <div className="flex w-full justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setIsPhotoDialogOpen(false)}>Fechar</Button>
+                  <Button onClick={() => setIsTakingNewPhoto(true)}>
+                    <Camera className="mr-2 h-4 w-4" /> 
+                    {task.signed_photo_url ? "Tirar Nova Foto" : "Tirar Foto"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
         <AlertDialog>
