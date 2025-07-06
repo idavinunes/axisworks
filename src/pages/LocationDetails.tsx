@@ -18,9 +18,11 @@ import { formatAddress, generateMapsUrl } from "@/utils/address";
 import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSession } from "@/contexts/SessionContext";
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useSession();
   const [location, setLocation] = useState<Location | null>(null);
   const [demands, setDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,60 +145,62 @@ const LocationDetails = () => {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Demandas</CardTitle>
-            <Dialog open={isDemandDialogOpen} onOpenChange={setIsDemandDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Criar Demanda
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Nova Demanda</DialogTitle>
-                  <DialogDescription>
-                    Dê um nome e uma data de início para a nova demanda.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="demand-title">Título da Demanda</Label>
-                    <Input
-                      id="demand-title"
-                      value={newDemandTitle}
-                      onChange={(e) => setNewDemandTitle(e.target.value)}
-                      placeholder="Ex: Instalação do cliente XPTO"
-                    />
+            {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+              <Dialog open={isDemandDialogOpen} onOpenChange={setIsDemandDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Criar Demanda
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Criar Nova Demanda</DialogTitle>
+                    <DialogDescription>
+                      Dê um nome e uma data de início para a nova demanda.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="demand-title">Título da Demanda</Label>
+                      <Input
+                        id="demand-title"
+                        value={newDemandTitle}
+                        onChange={(e) => setNewDemandTitle(e.target.value)}
+                        placeholder="Ex: Instalação do cliente XPTO"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="demand-date">Data de Início</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !newDemandDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {newDemandDate ? format(newDemandDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={newDemandDate}
+                            onSelect={setNewDemandDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="demand-date">Data de Início</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !newDemandDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {newDemandDate ? format(newDemandDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={newDemandDate}
-                          onSelect={setNewDemandDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleCreateDemand}>Salvar</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <DialogFooter>
+                    <Button onClick={handleCreateDemand}>Salvar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -220,27 +224,29 @@ const LocationDetails = () => {
                       <span className="text-xs text-muted-foreground mr-2">
                         {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
                       </span>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
-                              Deletar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {profile?.role === 'admin' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
+                                Deletar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </li>
                 );

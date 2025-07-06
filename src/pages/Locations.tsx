@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
 
 const Locations = () => {
-  const { user } = useSession();
+  const { user, profile } = useSession();
   const navigate = useNavigate();
   const [locations, setLocations] = useState<Location[]>([]);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -40,7 +40,6 @@ const Locations = () => {
     const { data, error } = await supabase
       .from("locations")
       .select("*")
-      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -126,7 +125,7 @@ const Locations = () => {
   };
 
   const handleCardClick = (location: Location) => {
-    if (hasJoined) {
+    if (hasJoined || profile?.role === 'admin' || profile?.role === 'supervisor') {
       navigate(`/locations/${location.id}`);
     } else {
       setSelectedLocation(location);
@@ -152,54 +151,56 @@ const Locations = () => {
       </Link>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Locais de Trabalho</h1>
-        <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleOpenAddDialog}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Local
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{isEditing ? "Editar Local" : "Adicionar Novo Local"}</DialogTitle>
-              <DialogDescription>{isEditing ? "Atualize os dados do cliente e endereço." : "Preencha os dados do cliente e endereço."}</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2">
-                  <Label htmlFor="client_name">Nome do Cliente</Label>
-                  <Input id="client_name" value={formData.client_name || ""} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="street_name">Nome da Rua/Avenida</Label>
-                  <Input id="street_name" value={formData.street_name || ""} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="street_number">Número</Label>
-                  <Input id="street_number" value={formData.street_number || ""} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit_number">Apto/Unidade (Opcional)</Label>
-                  <Input id="unit_number" value={formData.unit_number || ""} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" value={formData.city || ""} onChange={handleInputChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">Estado (Sigla)</Label>
-                  <Input id="state" value={formData.state || ""} onChange={handleInputChange} maxLength={2} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="zip_code">CEP (ZIP Code)</Label>
-                  <Input id="zip_code" value={formData.zip_code || ""} onChange={handleInputChange} />
+        {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+          <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleOpenAddDialog}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Local
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>{isEditing ? "Editar Local" : "Adicionar Novo Local"}</DialogTitle>
+                <DialogDescription>{isEditing ? "Atualize os dados do cliente e endereço." : "Preencha os dados do cliente e endereço."}</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="client_name">Nome do Cliente</Label>
+                    <Input id="client_name" value={formData.client_name || ""} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="street_name">Nome da Rua/Avenida</Label>
+                    <Input id="street_name" value={formData.street_name || ""} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="street_number">Número</Label>
+                    <Input id="street_number" value={formData.street_number || ""} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_number">Apto/Unidade (Opcional)</Label>
+                    <Input id="unit_number" value={formData.unit_number || ""} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Cidade</Label>
+                    <Input id="city" value={formData.city || ""} onChange={handleInputChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">Estado (Sigla)</Label>
+                    <Input id="state" value={formData.state || ""} onChange={handleInputChange} maxLength={2} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zip_code">CEP (ZIP Code)</Label>
+                    <Input id="zip_code" value={formData.zip_code || ""} onChange={handleInputChange} />
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" onClick={handleFormSubmit}>Salvar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button type="submit" onClick={handleFormSubmit}>Salvar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -207,36 +208,40 @@ const Locations = () => {
           locations.map((location) => (
             <Card 
               key={location.id} 
-              className="h-full hover:bg-accent cursor-pointer"
+              className="h-full hover:bg-accent"
               onClick={() => handleCardClick(location)}
             >
               <CardHeader className="flex flex-row items-start justify-between">
                 <CardTitle>{location.client_name}</CardTitle>
                 <div className="flex items-center -mt-2 -mr-2">
-                  <Button variant="ghost" size="icon" className="hover:bg-accent hover:text-primary" onClick={(e) => { e.stopPropagation(); handleOpenEditDialog(location); }}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <AlertDialog onOpenChange={(e) => e.stopPropagation()} >
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação não pode ser desfeita e irá deletar o local e todas as suas demandas associadas.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteLocation(location.id)} className="bg-destructive hover:bg-destructive/90">
-                          Deletar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+                    <Button variant="ghost" size="icon" className="hover:bg-accent hover:text-primary" onClick={(e) => { e.stopPropagation(); handleOpenEditDialog(location); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {profile?.role === 'admin' && (
+                    <AlertDialog onOpenChange={(e) => e.stopPropagation()} >
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita e irá deletar o local e todas as suas demandas associadas.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteLocation(location.id)} className="bg-destructive hover:bg-destructive/90">
+                            Deletar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>

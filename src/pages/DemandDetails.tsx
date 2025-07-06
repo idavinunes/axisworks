@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Demand, Task } from "@/types";
+import { Demand, Task, Profile } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,9 @@ import { formatAddress, generateMapsUrl } from "@/utils/address";
 import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSession } from "@/contexts/SessionContext";
 
-const TaskItem = ({ task, onUpdate, demandStartDate }: { task: Task, onUpdate: () => void, demandStartDate?: string | null }) => {
+const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, onUpdate: () => void, demandStartDate?: string | null, profile: Profile | null }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [photoAction, setPhotoAction] = useState<'start' | 'end' | null>(null);
   const [isViewingPhotos, setIsViewingPhotos] = useState(false);
@@ -227,23 +228,25 @@ const TaskItem = ({ task, onUpdate, demandStartDate }: { task: Task, onUpdate: (
             </DialogContent>
           </Dialog>
         )}
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-              <AlertDialogDescription>Esta ação irá deletar permanentemente a tarefa e suas fotos.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                <AlertDialogDescription>Esta ação irá deletar permanentemente a tarefa e suas fotos.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
         <DialogContent>
@@ -260,6 +263,7 @@ const TaskItem = ({ task, onUpdate, demandStartDate }: { task: Task, onUpdate: (
 
 const DemandDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useSession();
   const [demand, setDemand] = useState<Demand | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -410,57 +414,59 @@ const DemandDetails = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} />
+              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} profile={profile} />
             ))}
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Dialog open={isAddTaskDialogOpen} onOpenChange={setIsAddTaskDialogOpen}>
-              <DialogTrigger asChild>
-                <Button><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
-                  <DialogDescription>
-                    Preencha os detalhes da nova tarefa.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="task-title">Título da Tarefa</Label>
-                    <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Limpar a área externa" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Horas Presumidas (Opcional)</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                            <Label htmlFor="presumed-h" className="text-xs text-muted-foreground">Horas</Label>
-                            <Input 
-                                id="presumed-h" 
-                                type="number" 
-                                value={newPresumedH} 
-                                onChange={(e) => setNewPresumedH(e.target.value)}
-                                placeholder="Ex: 1"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="presumed-m" className="text-xs text-muted-foreground">Minutos</Label>
-                            <Input 
-                                id="presumed-m" 
-                                type="number" 
-                                value={newPresumedM} 
-                                onChange={(e) => setNewPresumedM(e.target.value)}
-                                placeholder="Ex: 30"
-                            />
-                        </div>
+            {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+              <Dialog open={isAddTaskDialogOpen} onOpenChange={setIsAddTaskDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
+                    <DialogDescription>
+                      Preencha os detalhes da nova tarefa.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-title">Título da Tarefa</Label>
+                      <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Limpar a área externa" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Horas Presumidas (Opcional)</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                              <Label htmlFor="presumed-h" className="text-xs text-muted-foreground">Horas</Label>
+                              <Input 
+                                  id="presumed-h" 
+                                  type="number" 
+                                  value={newPresumedH} 
+                                  onChange={(e) => setNewPresumedH(e.target.value)}
+                                  placeholder="Ex: 1"
+                              />
+                          </div>
+                          <div className="space-y-1">
+                              <Label htmlFor="presumed-m" className="text-xs text-muted-foreground">Minutos</Label>
+                              <Input 
+                                  id="presumed-m" 
+                                  type="number" 
+                                  value={newPresumedM} 
+                                  onChange={(e) => setNewPresumedM(e.target.value)}
+                                  placeholder="Ex: 30"
+                              />
+                          </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleAddTask}>Salvar Tarefa</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <DialogFooter>
+                    <Button onClick={handleAddTask}>Salvar Tarefa</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardContent>
       </Card>

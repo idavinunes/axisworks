@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, UserRole } from "@/types";
-import { PlusCircle, UserCheck, Shield, User } from "lucide-react";
+import { PlusCircle, UserCheck, Shield, User, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
+import { Link } from "react-router-dom";
 
 const roleIcons: Record<UserRole, React.ReactNode> = {
   admin: <Shield className="h-5 w-5 text-red-500" />,
@@ -18,7 +19,7 @@ const roleIcons: Record<UserRole, React.ReactNode> = {
 };
 
 const EmployeeManagement = () => {
-  const { profile: currentAdminProfile } = useSession();
+  const { profile: currentUserProfile } = useSession();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,8 +40,10 @@ const EmployeeManagement = () => {
   };
 
   useEffect(() => {
-    fetchProfiles();
-  }, []);
+    if (currentUserProfile) {
+      fetchProfiles();
+    }
+  }, [currentUserProfile]);
 
   const resetForm = () => {
     setFullName("");
@@ -76,7 +79,7 @@ const EmployeeManagement = () => {
     }
   };
 
-  if (currentAdminProfile?.role !== 'admin') {
+  if (currentUserProfile?.role !== 'admin' && currentUserProfile?.role !== 'supervisor') {
     return (
       <div className="container mx-auto p-4 text-center">
         <h1 className="text-2xl font-bold text-destructive">Acesso Negado</h1>
@@ -86,8 +89,12 @@ const EmployeeManagement = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+       <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+        <ArrowLeft className="h-4 w-4" />
+        Voltar para o Início
+      </Link>
+      <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Gerenciamento de Equipe</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -122,9 +129,13 @@ const EmployeeManagement = () => {
                     <SelectValue placeholder="Selecione um perfil" />
                   </SelectTrigger>
                   <SelectContent>
+                    {currentUserProfile?.role === 'admin' && (
+                      <>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="supervisor">Supervisor</SelectItem>
+                      </>
+                    )}
                     <SelectItem value="user">Usuário</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
