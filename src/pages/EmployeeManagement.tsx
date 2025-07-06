@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, UserRole } from "@/types";
-import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil, DollarSign } from "lucide-react";
+import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil, DollarSign, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
@@ -102,7 +102,7 @@ const EmployeeManagement = () => {
     if (error) {
       showError(`Falha ao criar usuário: ${error.message}`);
     } else {
-      showSuccess("Usuário criado com sucesso!");
+      showSuccess("Usuário criado e aguardando aprovação!");
       handleDialogClose();
       fetchProfiles();
     }
@@ -131,6 +131,20 @@ const EmployeeManagement = () => {
     } else {
       showSuccess("Usuário atualizado com sucesso!");
       handleDialogClose();
+      fetchProfiles();
+    }
+  };
+
+  const handleApproveUser = async (userId: string) => {
+    setIsLoading(true);
+    const { error } = await supabase.functions.invoke("approve-user", {
+      body: { user_id: userId },
+    });
+    setIsLoading(false);
+    if (error) {
+      showError(`Falha ao aprovar usuário: ${error.message}`);
+    } else {
+      showSuccess("Usuário aprovado com sucesso!");
       fetchProfiles();
     }
   };
@@ -229,24 +243,21 @@ const EmployeeManagement = () => {
                 <p className="text-sm text-muted-foreground break-all">{profile.email}</p>
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-sm font-medium capitalize">{profile.role}</p>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Badge variant={profile.is_confirmed ? "default" : "secondary"} className={profile.is_confirmed ? "bg-green-500 hover:bg-green-600" : ""}>
-                          {profile.is_confirmed ? "Ativo" : "Pendente"}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{profile.is_confirmed ? "E-mail confirmado pelo usuário." : "Aguardando confirmação de e-mail."}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Badge variant={profile.status === 'active' ? 'default' : 'secondary'} className={profile.status === 'active' ? "bg-green-500 hover:bg-green-600" : ""}>
+                    {profile.status === 'active' ? "Ativo" : "Pendente"}
+                  </Badge>
                 </div>
                  {profile.hourly_cost && profile.hourly_cost > 0 && (
                   <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                     <DollarSign className="h-4 w-4" />
                     <span>{`$${profile.hourly_cost.toFixed(2)} / hora`}</span>
                   </div>
+                )}
+                {profile.status === 'pending' && (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'supervisor') && (
+                  <Button className="w-full mt-4" size="sm" onClick={() => handleApproveUser(profile.id)} disabled={isLoading}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Aprovar Usuário
+                  </Button>
                 )}
               </CardContent>
             </Card>

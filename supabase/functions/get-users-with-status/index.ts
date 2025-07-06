@@ -35,7 +35,9 @@ serve(async (req) => {
         full_name: user.user_metadata?.full_name || 'Nome não definido',
         email: user.email,
         role: profile?.role || 'user',
+        status: profile?.status || 'pending', // Retorna o status do perfil
         is_confirmed: !!user.email_confirmed_at,
+        hourly_cost: profile?.hourly_cost || 0,
       };
     });
 

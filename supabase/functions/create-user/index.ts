@@ -22,11 +22,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // 1. Criar o usuário no Auth
+    // 1. Criar o usuário no Auth sem enviar e-mail de confirmação
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Mantém true para não enviar e-mail, o controle é feito pelo status
       user_metadata: { full_name },
     });
 
@@ -39,12 +39,13 @@ serve(async (req) => {
       throw new Error("A criação do usuário não retornou um usuário válido.");
     }
 
-    // 2. O trigger 'handle_new_user' já criou o perfil. Agora, atualizamos com o role e o custo.
+    // 2. O trigger 'handle_new_user' já criou o perfil. Agora, atualizamos com role, custo e o status 'pending'.
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
         role: role,
-        hourly_cost: hourly_cost || 0
+        hourly_cost: hourly_cost || 0,
+        status: 'pending' // Define o status inicial como pendente
       })
       .eq('id', newUser.id);
 
@@ -54,7 +55,7 @@ serve(async (req) => {
       throw new Error(`Erro ao definir o perfil do usuário: ${profileError.message}`);
     }
 
-    return new Response(JSON.stringify({ message: "Usuário criado com sucesso!", user: newUser }), {
+    return new Response(JSON.stringify({ message: "Usuário criado com sucesso e aguardando aprovação.", user: newUser }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

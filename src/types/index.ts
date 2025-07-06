@@ -1,4 +1,5 @@
 export type UserRole = "admin" | "supervisor" | "user";
+export type ProfileStatus = "active" | "pending" | "suspended";
 
 export type TaskStatus = "pending" | "in_progress" | "pending_approval" | "approved";
 
@@ -7,7 +8,8 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   email: string;
-  is_confirmed: boolean;
+  is_confirmed: boolean; // Manteremos para referência, mas não para lógica de acesso
+  status: ProfileStatus;
   hourly_cost?: number;
 }
 
