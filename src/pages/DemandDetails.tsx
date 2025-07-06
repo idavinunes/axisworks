@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Demand, Task, Profile, TaskStatus } from "@/types";
+import { Demand, Task, Profile, TaskStatus, MaterialCost } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil, Hourglass, BadgeCheck } from "lucide-react";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil, Hourglass, BadgeCheck, ShoppingCart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
@@ -213,14 +213,22 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
 
 const DemandDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const { profile } = useSession();
+  const { profile, user } = useSession();
   const [demand, setDemand] = useState<Demand | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [materialCosts, setMaterialCosts] = useState<MaterialCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // State for dialogs
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  // State for forms
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newCostDescription, setNewCostDescription] = useState("");
+  const [newCostAmount, setNewCostAmount] = useState("");
   const [newStartDate, setNewStartDate] = useState<Date | undefined>();
 
   const forceRefresh = () => setRefreshKey(k => k + 1);
@@ -230,9 +238,10 @@ const DemandDetails = () => {
       if (!id) { setLoading(false); return; }
       setLoading(true);
       try {
-        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
+        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*), material_costs(*)").eq("id", id).single();
         if (demandError) throw demandError;
         setDemand(demandData);
+        setMaterialCosts(demandData.material_costs || []);
         if (demandData?.start_date) {
           setNewStartDate(new Date(demandData.start_date + 'T00:00:00'));
         }
@@ -282,6 +291,45 @@ const DemandDetails = () => {
     }
   };
 
+  const handleAddCost = async () => {
+    if (!newCostDescription.trim() || !newCostAmount.trim() || !id || !user) {
+      showError("Descrição e valor são obrigatórios.");
+      return;
+    }
+    const amount = parseFloat(newCostAmount);
+    if (isNaN(amount)) {
+      showError("O valor deve ser um número.");
+      return;
+    }
+
+    const { error } = await supabase.from("material_costs").insert({
+      description: newCostDescription,
+      amount,
+      demand_id: id,
+      user_id: user.id,
+    });
+
+    if (error) {
+      showError("Falha ao adicionar custo.");
+    } else {
+      showSuccess("Custo adicionado com sucesso!");
+      setNewCostDescription("");
+      setNewCostAmount("");
+      setIsCostDialogOpen(false);
+      forceRefresh();
+    }
+  };
+
+  const handleDeleteCost = async (costId: string) => {
+    const { error } = await supabase.from("material_costs").delete().eq("id", costId);
+    if (error) {
+      showError("Falha ao deletar custo.");
+    } else {
+      showSuccess("Custo deletado com sucesso.");
+      forceRefresh();
+    }
+  };
+
   const handleUpdateDate = async () => {
     if (!newStartDate || !demand) {
       showError("Por favor, selecione uma nova data.");
@@ -302,8 +350,8 @@ const DemandDetails = () => {
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
 
-  const totalSeconds = calculateTotalDuration(tasks.filter(t => t.status === 'approved'));
-  const totalCost = tasks.reduce((acc, task) => {
+  const laborTotalSeconds = calculateTotalDuration(tasks.filter(t => t.status === 'approved'));
+  const laborTotalCost = tasks.reduce((acc, task) => {
     if (task.status === 'approved' && task.profiles?.hourly_cost) {
       const start = new Date(task.started_at!).getTime();
       const end = new Date(task.completed_at!).getTime();
@@ -312,6 +360,9 @@ const DemandDetails = () => {
     }
     return acc;
   }, 0);
+
+  const materialTotalCost = materialCosts.reduce((acc, cost) => acc + cost.amount, 0);
+  const grandTotalCost = laborTotalCost + materialTotalCost;
 
   return (
     <div className="space-y-6">
@@ -334,15 +385,13 @@ const DemandDetails = () => {
             </div>
             <div className="text-left sm:text-right flex-shrink-0 space-y-1">
               <div className="flex items-center sm:justify-end gap-2">
-                <p className="font-bold text-lg">{formatTotalTime(totalSeconds)}</p>
+                <p className="font-bold text-lg">{formatTotalTime(laborTotalSeconds)}</p>
                 <Clock className="h-5 w-5 text-muted-foreground" />
               </div>
-              {totalCost > 0 && (
-                <div className="flex items-center sm:justify-end gap-2">
-                  <p className="font-bold text-lg text-green-600">$ {totalCost.toFixed(2)}</p>
-                  <DollarSign className="h-5 w-5 text-muted-foreground" />
-                </div>
-              )}
+              <div className="flex items-center sm:justify-end gap-2">
+                <p className="font-bold text-lg text-green-600">$ {grandTotalCost.toFixed(2)}</p>
+                <DollarSign className="h-5 w-5 text-muted-foreground" />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -361,16 +410,8 @@ const DemandDetails = () => {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={newStartDate}
-                    onSelect={setNewStartDate}
-                    initialFocus
-                    locale={ptBR}
-                  />
-                  <div className="p-2 border-t">
-                    <Button onClick={handleUpdateDate} className="w-full" size="sm">Salvar Data</Button>
-                  </div>
+                  <Calendar mode="single" selected={newStartDate} onSelect={setNewStartDate} initialFocus locale={ptBR} />
+                  <div className="p-2 border-t"><Button onClick={handleUpdateDate} className="w-full" size="sm">Salvar Data</Button></div>
                 </PopoverContent>
               </Popover>
             )}
@@ -382,26 +423,68 @@ const DemandDetails = () => {
           </div>
           {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
             <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button variant="outline" className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button></DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Adicionar Nova Tarefa</DialogTitle></DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="task-title">Título da Tarefa</Label>
-                    <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Verificar fiação" />
-                  </div>
+                  <div className="space-y-2"><Label htmlFor="task-title">Título da Tarefa</Label><Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Verificar fiação" /></div>
                 </div>
-                <DialogFooter>
-                  <Button onClick={handleAddTask}>Salvar Tarefa</Button>
-                </DialogFooter>
+                <DialogFooter><Button onClick={handleAddTask}>Salvar Tarefa</Button></DialogFooter>
               </DialogContent>
             </Dialog>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Card de Custos de Material */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle>Custos de Material</CardTitle>
+            <CardDescription>Total: <span className="font-bold text-primary">$ {materialTotalCost.toFixed(2)}</span></CardDescription>
+          </div>
+          {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+            <Dialog open={isCostDialogOpen} onOpenChange={setIsCostDialogOpen}>
+              <DialogTrigger asChild><Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Adicionar</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Adicionar Custo ou Sobra</DialogTitle>
+                  <DialogDescription>Descreva o item e seu valor. Use um valor negativo para sobras (crédito).</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2"><Label htmlFor="cost-desc">Descrição</Label><Input id="cost-desc" value={newCostDescription} onChange={(e) => setNewCostDescription(e.target.value)} placeholder="Ex: Rolo de fio 100m" /></div>
+                  <div className="space-y-2"><Label htmlFor="cost-amount">Valor ($)</Label><Input id="cost-amount" type="number" value={newCostAmount} onChange={(e) => setNewCostAmount(e.target.value)} placeholder="Ex: 150.00 ou -25.00" /></div>
+                </div>
+                <DialogFooter><Button onClick={handleAddCost}>Salvar</Button></DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </CardHeader>
+        <CardContent>
+          {materialCosts.length > 0 ? (
+            <ul className="space-y-2">
+              {materialCosts.map(cost => (
+                <li key={cost.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                  <span className="flex-grow">{cost.description}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("font-mono", cost.amount < 0 ? "text-green-600" : "text-destructive")}>
+                      {cost.amount < 0 ? `- $${(-cost.amount).toFixed(2)}` : `$ ${cost.amount.toFixed(2)}`}
+                    </span>
+                    {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader><AlertDialogTitle>Confirmar exclusão</AlertDialogTitle><AlertDialogDescription>Deseja realmente remover o custo "{cost.description}"?</AlertDialogDescription></AlertDialogHeader>
+                          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteCost(cost.id)} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">Nenhum custo de material adicionado.</p>
           )}
         </CardContent>
       </Card>

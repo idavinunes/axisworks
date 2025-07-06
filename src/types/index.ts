@@ -25,6 +25,15 @@ export interface Location {
   demands?: Demand[];
 }
 
+export interface MaterialCost {
+  id: string;
+  demand_id: string;
+  description: string;
+  amount: number;
+  created_at: string;
+  user_id: string;
+}
+
 export interface Demand {
   id: string;
   user_id: string;
@@ -36,6 +45,7 @@ export interface Demand {
   locations: Location | null; // This can be simplified later if not needed
   start_date?: string | null;
   demand_workers: { worker_id: string }[];
+  material_costs?: MaterialCost[];
 }
 
 export interface Task {
