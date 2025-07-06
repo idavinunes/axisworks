@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
 import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const roleIcons: Record<UserRole, React.ReactNode> = {
   admin: <Shield className="h-5 w-5 text-red-500" />,
@@ -32,11 +34,11 @@ const EmployeeManagement = () => {
   const [role, setRole] = useState<UserRole>("user");
 
   const fetchProfiles = async () => {
-    const { data, error } = await supabase.from("profiles").select("*");
+    const { data, error } = await supabase.functions.invoke("get-users-with-status");
     if (error) {
       showError("Falha ao carregar a lista de usuários.");
     } else {
-      setProfiles(data || []);
+      setProfiles(data.users || []);
     }
   };
 
@@ -62,6 +64,7 @@ const EmployeeManagement = () => {
   const handleOpenEditDialog = (profile: Profile) => {
     setEditingProfile(profile);
     setFullName(profile.full_name);
+    setEmail(profile.email);
     setRole(profile.role);
     setPassword(""); // Clear password for editing
     setIsDialogOpen(true);
@@ -163,12 +166,10 @@ const EmployeeManagement = () => {
               <Label htmlFor="fullName">Nome Completo</Label>
               <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ex: João da Silva" />
             </div>
-            {!editingProfile && (
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao.silva@email.com" />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao.silva@email.com" disabled={!!editingProfile} />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={editingProfile ? "Deixe em branco para não alterar" : "••••••••"} />
@@ -205,7 +206,7 @@ const EmployeeManagement = () => {
             <Card key={profile.id}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>{profile.full_name}</CardTitle>
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
                   {currentUserProfile?.role === 'admin' && (
                     <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(profile)}>
                       <Pencil className="h-4 w-4" />
@@ -215,7 +216,22 @@ const EmployeeManagement = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm font-medium text-muted-foreground capitalize">{profile.role}</p>
+                <p className="text-sm text-muted-foreground break-all">{profile.email}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm font-medium capitalize">{profile.role}</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant={profile.is_confirmed ? "default" : "secondary"} className={profile.is_confirmed ? "bg-green-500 hover:bg-green-600" : ""}>
+                          {profile.is_confirmed ? "Ativo" : "Pendente"}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{profile.is_confirmed ? "E-mail confirmado pelo usuário." : "Aguardando confirmação de e-mail."}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </CardContent>
             </Card>
           ))

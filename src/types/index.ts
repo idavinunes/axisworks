@@ -4,6 +4,8 @@ export interface Profile {
   id: string;
   full_name: string;
   role: UserRole;
+  email: string;
+  is_confirmed: boolean;
 }
 
 export interface Location {
