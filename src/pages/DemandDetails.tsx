@@ -102,39 +102,38 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
 
   const { formatted: formattedDuration, seconds: actualDurationSeconds } = calculateDuration();
 
-  const renderDurationComparison = () => {
-    if (!task.is_completed || task.presumed_hours === null || task.presumed_hours === undefined) return null;
-
-    const presumedSeconds = task.presumed_hours * 3600;
-    const differenceSeconds = actualDurationSeconds - presumedSeconds;
-    
-    let color = "text-muted-foreground";
-    let message = "";
-
-    if (differenceSeconds > 300) { // 5 minutes tolerance
-        color = "text-orange-500 font-semibold"; // Exceeded
-        message = `(+${formatTotalTime(differenceSeconds)})`;
-    } else if (differenceSeconds < -300) { // 5 minutes tolerance
-        color = "text-green-600 font-semibold"; // Less time
-        message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
-    }
-
-    return (
-        <div className={`text-xs mt-1`}>
-            <span>Prev: {task.presumed_hours}h</span>
-            {message && <span className={`ml-1 ${color}`}>{message}</span>}
-        </div>
-    );
-  };
-
   const renderStatus = () => {
     if (task.is_completed) {
+      let statusColor = "text-green-600";
+      let comparisonElement = null;
+
+      if (task.presumed_hours !== null && task.presumed_hours !== undefined) {
+        const presumedSeconds = task.presumed_hours * 3600;
+        const differenceSeconds = actualDurationSeconds - presumedSeconds;
+        let message = "";
+
+        if (differenceSeconds > 300) { // Took longer
+          statusColor = "text-red-600";
+          message = `(+${formatTotalTime(differenceSeconds)})`;
+        } else if (differenceSeconds < -300) { // Finished earlier
+          statusColor = "text-red-600";
+          message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
+        }
+        
+        comparisonElement = (
+          <div className="text-xs mt-1">
+              <span>Prev: {task.presumed_hours}h</span>
+              {message && <span className="ml-1 font-semibold">{message}</span>}
+          </div>
+        );
+      }
+
       return (
-        <div className="flex flex-col items-center text-green-600">
+        <div className={`flex flex-col items-center ${statusColor}`}>
           <CheckCircle2 className="h-5 w-5" />
           <span className="text-xs font-semibold">Concluída</span>
           <span className="text-xs font-mono">{formattedDuration}</span>
-          {renderDurationComparison()}
+          {comparisonElement}
         </div>
       );
     }
@@ -373,7 +372,7 @@ const DemandDetails = () => {
                   <DialogDescription>
                     Preencha os detalhes da nova tarefa.
                   </DialogDescription>
-                </DialogHeader>
+                </Header>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="task-title">Título da Tarefa</Label>
