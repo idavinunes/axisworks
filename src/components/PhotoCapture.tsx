@@ -13,6 +13,19 @@ interface PhotoCaptureProps {
   onCancel: () => void;
 }
 
+const getGeolocationErrorMessage = (code: number) => {
+  switch (code) {
+    case 1:
+      return "Permissão de localização negada. Verifique as configurações do seu navegador.";
+    case 2:
+      return "Não foi possível obter a localização. Verifique sua conexão.";
+    case 3:
+      return "A obtenção da localização demorou muito (timeout).";
+    default:
+      return "Ocorreu um erro desconhecido ao obter a localização.";
+  }
+};
+
 const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -68,7 +81,7 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
       },
       (err) => {
         console.error("Error getting location:", err);
-        const errorMessage = "Não foi possível obter a localização. Verifique as permissões.";
+        const errorMessage = getGeolocationErrorMessage(err.code);
         setLocationError(errorMessage);
         showError(errorMessage);
         setIsFetchingLocation(false);
