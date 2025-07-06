@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Demand, Task, Profile } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -77,7 +77,21 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
   };
 
   const handleDeleteTask = async () => {
-    // ... (código de deletar tarefa permanece o mesmo)
+    const filesToDelete: string[] = [];
+    if (task.start_photo_url) filesToDelete.push(task.start_photo_url);
+    if (task.end_photo_url) filesToDelete.push(task.end_photo_url);
+
+    if (filesToDelete.length > 0) {
+      await supabase.storage.from('task-photos').remove(filesToDelete);
+    }
+
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (error) {
+      showError("Erro ao deletar tarefa.");
+    } else {
+      showSuccess("Tarefa deletada com sucesso.");
+      onUpdate();
+    }
   };
 
   const calculateDuration = () => {
@@ -85,23 +99,24 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
     const start = new Date(task.started_at).getTime();
     const end = new Date(task.completed_at).getTime();
     const diffSeconds = Math.floor((end - start) / 1000);
-    
-    const hours = Math.floor(diffSeconds / 3600);
-    const minutes = Math.floor((diffSeconds % 3600) / 60);
-    const seconds = diffSeconds % 60;
-    return {
-        formatted: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-        seconds: diffSeconds
-    };
+    return { seconds: diffSeconds };
   };
 
-  const { formatted: formattedDuration } = calculateDuration();
+  const renderStatus = () => {
+    if (task.is_completed) {
+      return <CheckCircle2 className="h-6 w-6 text-green-500" />;
+    }
+    if (task.started_at) {
+      return <Clock className="h-6 w-6 text-blue-500 animate-pulse" />;
+    }
+    return <CalendarIcon className="h-6 w-6 text-muted-foreground" />;
+  };
 
   return (
     <div className="flex flex-col gap-2 p-3 border rounded-md">
       <div className="flex items-center gap-4">
-        <div className="w-24 text-center">
-          {/* renderStatus() logic here */}
+        <div className="w-10 text-center flex justify-center items-center">
+          {renderStatus()}
         </div>
         <span className="flex-grow font-medium">{task.title}</span>
         <div className="flex items-center gap-2">
@@ -124,11 +139,27 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
               <Camera className="mr-2 h-4 w-4" /> Finalizar
             </Button>
           )}
-          {(task.start_photo_url || task.end_photo_url) && (
+          {(task.signed_start_photo_url || task.signed_end_photo_url) && (
             <Dialog open={isViewingPhotos} onOpenChange={setIsViewingPhotos}>
               <DialogTrigger asChild><Button variant="outline" size="icon"><ImageIcon className="h-4 w-4" /></Button></DialogTrigger>
               <DialogContent>
-                {/* Photo viewing logic */}
+                <DialogHeader>
+                  <DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {task.signed_start_photo_url && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Foto de Início</h3>
+                      <img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" />
+                    </div>
+                  )}
+                  {task.signed_end_photo_url && (
+                    <div>
+                      <h3 className="font-semibold mb-2">Foto de Fim</h3>
+                      <img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" />
+                    </div>
+                  )}
+                </div>
               </DialogContent>
             </Dialog>
           )}
@@ -136,7 +167,14 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
             <AlertDialog>
               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
               <AlertDialogContent>
-                {/* Delete confirmation */}
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>Esta ação não pode ser desfeita e irá deletar a tarefa "{task.title}".</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction>
+                </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           )}
@@ -157,7 +195,13 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
         </div>
       )}
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
-        {/* Photo capture dialog */}
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Capturar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle>
+            <DialogDescription>Centralize o objeto da foto e clique em "Tirar Foto".</DialogDescription>
+          </DialogHeader>
+          <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
+        </DialogContent>
       </Dialog>
     </div>
   );
@@ -168,9 +212,10 @@ const DemandDetails = () => {
   const { profile } = useSession();
   const [demand, setDemand] = useState<Demand | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  // ... (other states)
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
 
   const forceRefresh = () => setRefreshKey(k => k + 1);
 
@@ -186,8 +231,22 @@ const DemandDetails = () => {
         const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*, profiles!left(*)").eq("demand_id", id).order("created_at", { ascending: true });
         if (tasksError) throw tasksError;
 
-        // ... (photo URL signing logic)
-        setTasks(tasksData || []);
+        const signedTasks = await Promise.all(
+          (tasksData || []).map(async (task) => {
+            let signed_start_photo_url = null;
+            if (task.start_photo_url) {
+              const { data } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
+              signed_start_photo_url = data?.signedUrl;
+            }
+            let signed_end_photo_url = null;
+            if (task.end_photo_url) {
+              const { data } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
+              signed_end_photo_url = data?.signedUrl;
+            }
+            return { ...task, signed_start_photo_url, signed_end_photo_url };
+          })
+        );
+        setTasks(signedTasks);
 
       } catch (error) {
         showError("Falha ao carregar detalhes da demanda.");
@@ -198,7 +257,21 @@ const DemandDetails = () => {
     fetchData();
   }, [id, refreshKey]);
 
-  // ... (handleAddTask logic)
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim() || !id) {
+      showError("O título da tarefa é obrigatório.");
+      return;
+    }
+    const { error } = await supabase.from("tasks").insert({ title: newTaskTitle, demand_id: id });
+    if (error) {
+      showError("Falha ao adicionar tarefa.");
+    } else {
+      showSuccess("Tarefa adicionada com sucesso!");
+      setNewTaskTitle("");
+      setIsTaskDialogOpen(false);
+      forceRefresh();
+    }
+  };
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
@@ -216,11 +289,23 @@ const DemandDetails = () => {
 
   return (
     <div className="space-y-6">
-      {/* ... (Link back) */}
+      {demand.locations && (
+        <Link to={`/locations/${demand.locations.id}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+          <ArrowLeft className="h-4 w-4" />
+          Voltar para os Detalhes do Local
+        </Link>
+      )}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
-            {/* ... (Demand title and location) */}
+            <div>
+              <CardTitle className="text-2xl">{demand.title}</CardTitle>
+              {demand.locations && (
+                <CardDescription className="flex items-center gap-2 pt-1">
+                  <MapPin className="h-4 w-4" /> {formatAddress(demand.locations)}
+                </CardDescription>
+              )}
+            </div>
             <div className="text-right flex-shrink-0 space-y-1">
               <div className="flex items-center justify-end gap-2">
                 <p className="font-bold text-lg">{formatTotalTime(totalSeconds)}</p>
@@ -241,7 +326,29 @@ const DemandDetails = () => {
               <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} profile={profile} />
             ))}
           </div>
-          {/* ... (Add task button and dialog) */}
+          {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+            <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Adicionar Nova Tarefa</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="task-title">Título da Tarefa</Label>
+                    <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Verificar fiação" />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddTask}>Salvar Tarefa</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardContent>
       </Card>
     </div>
