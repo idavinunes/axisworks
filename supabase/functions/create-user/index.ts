@@ -26,7 +26,7 @@ serve(async (req) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Mantém true para não enviar e-mail, o controle é feito pelo status
+      email_confirm: true,
       user_metadata: { full_name },
     });
 
@@ -40,17 +40,17 @@ serve(async (req) => {
     }
 
     // 2. O trigger 'handle_new_user' já criou o perfil. Agora, atualizamos com role, custo e o status 'pending'.
+    const parsedCost = parseFloat(hourly_cost);
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({ 
         role: role,
-        hourly_cost: hourly_cost || 0,
-        status: 'pending' // Define o status inicial como pendente
+        hourly_cost: !isNaN(parsedCost) ? parsedCost : 0, // CORRIGIDO: Converte o valor para número
+        status: 'pending'
       })
       .eq('id', newUser.id);
 
     if (profileError) {
-      // Se a atualização do perfil falhar, deletamos o usuário recém-criado.
       await supabaseAdmin.auth.admin.deleteUser(newUser.id);
       throw new Error(`Erro ao definir o perfil do usuário: ${profileError.message}`);
     }
@@ -60,7 +60,7 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error)_ {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

@@ -40,13 +40,17 @@ serve(async (req) => {
     }
 
     // 2. Atualiza o perfil público dinamicamente
-    const profileUpdatePayload: { full_name: string; role: string; hourly_cost?: number } = {
+    const profileUpdatePayload: { [key: string]: any } = {
       full_name,
       role,
     };
 
-    if (hourly_cost !== undefined) {
-      profileUpdatePayload.hourly_cost = hourly_cost;
+    // CORRIGIDO: Apenas adiciona o custo/hora se for um número válido
+    if (hourly_cost !== undefined && hourly_cost !== null) {
+        const parsedCost = parseFloat(hourly_cost);
+        if (!isNaN(parsedCost)) {
+            profileUpdatePayload.hourly_cost = parsedCost;
+        }
     }
 
     const { error: profileError } = await supabaseAdmin
