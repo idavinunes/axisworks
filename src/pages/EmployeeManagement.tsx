@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, UserRole } from "@/types";
-import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil, DollarSign, CheckCircle } from "lucide-react";
+import { PlusCircle, UserCheck, Shield, User, ArrowLeft, Pencil, DollarSign, CheckCircle, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
@@ -31,6 +31,7 @@ const EmployeeManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -151,6 +152,11 @@ const EmployeeManagement = () => {
     }
   };
 
+  const filteredProfiles = profiles.filter(profile =>
+    profile.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    profile.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (currentUserProfile?.role !== 'admin' && currentUserProfile?.role !== 'supervisor') {
     return (
       <div className="container mx-auto p-4 text-center">
@@ -166,11 +172,21 @@ const EmployeeManagement = () => {
         <ArrowLeft className="mr-2 h-4 w-4" />
         Voltar para o Início
       </Link>
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold">Gerenciamento de Equipe</h1>
-        <Button onClick={handleOpenAddDialog}>
+        <Button onClick={handleOpenAddDialog} className="w-full sm:w-auto">
           <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Usuário
         </Button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nome ou e-mail..."
+          className="pl-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
@@ -228,50 +244,48 @@ const EmployeeManagement = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {isLoadingProfiles ? (
-          [...Array(3)].map((_, i) => (
-            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-1/2 mt-2" /></CardContent></Card>
+          [...Array(6)].map((_, i) => (
+            <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
           ))
         ) : profilesError ? (
           <p className="col-span-full text-center text-destructive">Erro ao carregar usuários: {profilesError.message}</p>
-        ) : profiles.length > 0 ? (
-          profiles.map((profile) => (
+        ) : filteredProfiles.length > 0 ? (
+          filteredProfiles.map((profile) => (
             <Card key={profile.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>{profile.full_name}</CardTitle>
-                <div className="flex items-center gap-2">
+              <CardContent className="p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-grow">
+                  <div className="flex-shrink-0">{roleIcons[profile.role]}</div>
+                  <div className="flex-grow">
+                    <p className="font-semibold leading-tight">{profile.full_name}</p>
+                    <p className="text-xs text-muted-foreground break-all">{profile.email}</p>
+                    {profile.hourly_cost && profile.hourly_cost > 0 && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                        <DollarSign className="h-3 w-3" />
+                        <span>{`$${profile.hourly_cost.toFixed(2)} / hora`}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                  <Badge variant={profile.status === 'active' ? 'default' : 'secondary'} className={cn("text-xs", profile.status === 'active' ? "bg-green-500 hover:bg-green-600" : "")}>
+                    {profile.status === 'active' ? "Ativo" : "Pendente"}
+                  </Badge>
+                  {profile.status === 'pending' && (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'supervisor') && (
+                    <Button size="icon" className="h-7 w-7" onClick={() => handleApproveUser(profile.id)} disabled={isSubmitting}>
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                  )}
                   {currentUserProfile?.role === 'admin' && (
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(profile)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEditDialog(profile)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  {roleIcons[profile.role]}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground break-all">{profile.email}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-sm font-medium capitalize">{profile.role}</p>
-                  <Badge variant={profile.status === 'active' ? 'default' : 'secondary'} className={profile.status === 'active' ? "bg-green-500 hover:bg-green-600" : ""}>
-                    {profile.status === 'active' ? "Ativo" : "Pendente"}
-                  </Badge>
-                </div>
-                 {profile.hourly_cost && profile.hourly_cost > 0 && (
-                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                    <DollarSign className="h-4 w-4" />
-                    <span>{`$${profile.hourly_cost.toFixed(2)} / hora`}</span>
-                  </div>
-                )}
-                {profile.status === 'pending' && (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'supervisor') && (
-                  <Button className="w-full mt-4" size="sm" onClick={() => handleApproveUser(profile.id)} disabled={isSubmitting}>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Aprovar Usuário
-                  </Button>
-                )}
               </CardContent>
             </Card>
           ))
         ) : (
-          <p>Nenhum usuário cadastrado ainda.</p>
+          <p className="col-span-full text-center text-muted-foreground py-8">Nenhum usuário encontrado.</p>
         )}
       </div>
     </div>

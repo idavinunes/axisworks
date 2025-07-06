@@ -11,6 +11,9 @@ const Layout = () => {
         <main className="flex flex-1 flex-col gap-4 p-4 lg:p-6 bg-muted/40">
           <Outlet />
         </main>
+        <footer className="p-4 text-center text-sm text-muted-foreground">
+          Developed with ❤️ by Axisnetworks
+        </footer>
       </div>
     </div>
   );
