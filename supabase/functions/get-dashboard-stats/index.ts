@@ -31,11 +31,11 @@ async function getStatsForPeriod(supabase: SupabaseClient, startDate: string, en
     .lt('created_at', endDate);
   if (demandsError) throw new Error(`Erro ao buscar demandas: ${demandsError.message}`);
 
-  // Total de tarefas completas no período
+  // Total de tarefas aprovadas no período
   const { count: completedTasks, error: tasksError } = await supabase
     .from('tasks')
     .select('*', { count: 'exact', head: true })
-    .eq('is_completed', true)
+    .eq('status', 'approved') // Alterado de is_completed para status
     .gte('completed_at', startDate)
     .lt('completed_at', endDate);
   if (tasksError) throw new Error(`Erro ao buscar tarefas: ${tasksError.message}`);

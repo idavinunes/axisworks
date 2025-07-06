@@ -1,5 +1,7 @@
 export type UserRole = "admin" | "supervisor" | "user";
 
+export type TaskStatus = "pending" | "in_progress" | "pending_approval" | "approved";
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -40,7 +42,7 @@ export interface Task {
   id:string;
   demand_id: string;
   title: string;
-  is_completed: boolean;
+  status: TaskStatus;
   start_photo_url: string | null;
   end_photo_url: string | null;
   started_at: string | null;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Demand, Task, Profile } from "@/types";
+import { Demand, Task, Profile, TaskStatus } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil } from "lucide-react";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil, Hourglass, BadgeCheck } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
@@ -40,42 +40,36 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
   const handlePhotoTaken = async (photoDataUrl: string) => {
     if (!photoAction || !profile) return;
 
-    // 1. Converte data URL para blob
     const response = await fetch(photoDataUrl);
     const blob = await response.blob();
-
-    // 2. Cria FormData
     const formData = new FormData();
     formData.append('photo', blob, 'photo.jpg');
     formData.append('taskId', task.id);
     formData.append('photoAction', photoAction);
 
-    // 3. Invoca a edge function
     const { data: functionData, error: functionError } = await supabase.functions.invoke('upload-task-photo', {
       body: formData,
     });
 
     if (functionError || !functionData.path) {
-      const errorMessage = functionError?.message || "Falha ao enviar foto.";
-      showError(errorMessage);
-      console.error("Function error:", functionError);
+      showError(functionError?.message || "Falha ao enviar foto.");
       setIsPhotoDialogOpen(false);
       return;
     }
     
-    // 4. Atualiza o registro da tarefa com o caminho retornado pela função
     let updatePayload: Partial<Task> = {};
     if (photoAction === 'start') {
       updatePayload = {
         start_photo_url: functionData.path,
         started_at: new Date().toISOString(),
         worker_id: profile.id,
+        status: 'in_progress',
       };
     } else {
       updatePayload = {
         end_photo_url: functionData.path,
         completed_at: new Date().toISOString(),
-        is_completed: true,
+        status: 'pending_approval',
       };
     }
 
@@ -88,6 +82,20 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
       onUpdate();
     }
     setIsPhotoDialogOpen(false);
+  };
+
+  const handleApproveTask = async () => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'approved' })
+      .eq('id', task.id);
+
+    if (error) {
+      showError("Erro ao aprovar a tarefa.");
+    } else {
+      showSuccess("Tarefa aprovada com sucesso!");
+      onUpdate();
+    }
   };
 
   const handleDeleteTask = async () => {
@@ -117,13 +125,17 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
   };
 
   const renderStatus = () => {
-    if (task.is_completed) {
-      return <CheckCircle2 className="h-6 w-6 text-green-500" />;
+    switch (task.status) {
+      case 'approved':
+        return <BadgeCheck className="h-6 w-6 text-green-500" />;
+      case 'pending_approval':
+        return <Hourglass className="h-6 w-6 text-yellow-500" />;
+      case 'in_progress':
+        return <Clock className="h-6 w-6 text-blue-500 animate-pulse" />;
+      case 'pending':
+      default:
+        return <CalendarIcon className="h-6 w-6 text-muted-foreground" />;
     }
-    if (task.started_at) {
-      return <Clock className="h-6 w-6 text-blue-500 animate-pulse" />;
-    }
-    return <CalendarIcon className="h-6 w-6 text-muted-foreground" />;
   };
 
   return (
@@ -134,7 +146,7 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
         </div>
         <span className="flex-grow font-medium">{task.title}</span>
         <div className="flex items-center gap-2">
-          {!task.started_at && (
+          {task.status === 'pending' && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -148,31 +160,24 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
               </Tooltip>
             </TooltipProvider>
           )}
-          {task.started_at && !task.completed_at && (
+          {task.status === 'in_progress' && (
             <Button size="sm" variant="destructive" onClick={() => { setPhotoAction('end'); setIsPhotoDialogOpen(true); }}>
               <Camera className="mr-2 h-4 w-4" /> Finalizar
+            </Button>
+          )}
+          {task.status === 'pending_approval' && (profile?.role === 'admin' || profile?.role === 'supervisor') && (
+            <Button size="sm" variant="default" onClick={handleApproveTask} className="bg-green-600 hover:bg-green-700">
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Aprovar
             </Button>
           )}
           {(task.signed_start_photo_url || task.signed_end_photo_url) && (
             <Dialog open={isViewingPhotos} onOpenChange={setIsViewingPhotos}>
               <DialogTrigger asChild><Button variant="outline" size="icon"><ImageIcon className="h-4 w-4" /></Button></DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle></DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {task.signed_start_photo_url && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Foto de Início</h3>
-                      <img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" />
-                    </div>
-                  )}
-                  {task.signed_end_photo_url && (
-                    <div>
-                      <h3 className="font-semibold mb-2">Foto de Fim</h3>
-                      <img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" />
-                    </div>
-                  )}
+                  {task.signed_start_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Início</h3><img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" /></div>)}
+                  {task.signed_end_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Fim</h3><img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" /></div>)}
                 </div>
               </DialogContent>
             </Dialog>
@@ -181,14 +186,8 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
             <AlertDialog>
               <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
               <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                  <AlertDialogDescription>Esta ação não pode ser desfeita e irá deletar a tarefa "{task.title}".</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction>
-                </AlertDialogFooter>
+                <AlertDialogHeader><AlertDialogTitle>Você tem certeza?</AlertDialogTitle><AlertDialogDescription>Esta ação não pode ser desfeita e irá deletar a tarefa "{task.title}".</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction></AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           )}
@@ -196,24 +195,13 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
       </div>
       {task.profiles && (
         <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-2 mt-2">
-          <div className="flex items-center gap-2">
-            <User className="h-3 w-3" />
-            <span>{task.profiles.full_name}</span>
-          </div>
-          {task.is_completed && task.profiles.hourly_cost && (
-            <div className="flex items-center gap-2 font-mono">
-              <DollarSign className="h-3 w-3" />
-              <span>Custo: R$ {((calculateDuration().seconds / 3600) * (task.profiles.hourly_cost || 0)).toFixed(2).replace('.', ',')}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2"><User className="h-3 w-3" /><span>{task.profiles.full_name}</span></div>
+          {task.status === 'approved' && task.profiles.hourly_cost && (<div className="flex items-center gap-2 font-mono"><DollarSign className="h-3 w-3" /><span>Custo: R$ {((calculateDuration().seconds / 3600) * (task.profiles.hourly_cost || 0)).toFixed(2).replace('.', ',')}</span></div>)}
         </div>
       )}
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Capturar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle>
-            <DialogDescription>Centralize o objeto da foto e clique em "Tirar Foto".</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Capturar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle><DialogDescription>Centralize o objeto da foto e clique em "Tirar Foto".</DialogDescription></DialogHeader>
           <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
         </DialogContent>
       </Dialog>
@@ -312,9 +300,9 @@ const DemandDetails = () => {
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
 
-  const totalSeconds = calculateTotalDuration(tasks);
+  const totalSeconds = calculateTotalDuration(tasks.filter(t => t.status === 'approved'));
   const totalCost = tasks.reduce((acc, task) => {
-    if (task.is_completed && task.profiles?.hourly_cost) {
+    if (task.status === 'approved' && task.profiles?.hourly_cost) {
       const start = new Date(task.started_at!).getTime();
       const end = new Date(task.completed_at!).getTime();
       const hours = (end - start) / (1000 * 60 * 60);

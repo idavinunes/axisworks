@@ -30,7 +30,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Buscar tarefas concluídas no período com os dados do perfil do trabalhador
+    // Buscar tarefas aprovadas no período com os dados do perfil do trabalhador
     const { data: tasks, error } = await supabase
       .from('tasks')
       .select(`
@@ -42,7 +42,7 @@ serve(async (req) => {
           hourly_cost
         )
       `)
-      .eq('is_completed', true)
+      .eq('status', 'approved') // Alterado de is_completed para status
       .gte('completed_at', startDate)
       .lte('completed_at', endDate);
 
