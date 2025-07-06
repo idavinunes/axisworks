@@ -60,7 +60,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   };
 
   const handleDeleteTask = async () => {
-    if (task.start_photo_url) {
+    if (task.start_photo_url || task.end_photo_url) {
         const { data: listData, error: listError } = await supabase.storage
             .from('task-photos')
             .list(task.id, { limit: 100 });
@@ -193,44 +193,53 @@ const DemandDetails = () => {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    if (!id) return;
-    setLoading(true);
-    const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
-
-    if (demandError) {
-      showError("Demanda não encontrada.");
-      setLoading(false);
-      return;
-    }
-    setDemand(demandData);
-
-    const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
-
-    if (tasksError) {
-      showError("Erro ao buscar tarefas.");
-      setTasks([]);
-    } else if (tasksData) {
-      const tasksWithSignedUrls = await Promise.all(
-        tasksData.map(async (task) => {
-          const signedUrls: Partial<Task> = {};
-          if (task.start_photo_url) {
-            const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
-            if (!error) signedUrls.signed_start_photo_url = data.signedUrl;
-          }
-          if (task.end_photo_url) {
-            const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
-            if (!error) signedUrls.signed_end_photo_url = data.signedUrl;
-          }
-          return { ...task, ...signedUrls };
-        })
-      );
-      setTasks(tasksWithSignedUrls);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
+    const fetchData = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
+
+        if (demandError) throw demandError;
+        setDemand(demandData);
+
+        const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
+
+        if (tasksError) throw tasksError;
+
+        if (tasksData) {
+          const tasksWithSignedUrls = await Promise.all(
+            tasksData.map(async (task) => {
+              const signedUrls: Partial<Task> = {};
+              if (task.start_photo_url) {
+                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
+                if (error) console.error("Error creating signed URL for start photo:", error.message);
+                else signedUrls.signed_start_photo_url = data.signedUrl;
+              }
+              if (task.end_photo_url) {
+                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
+                if (error) console.error("Error creating signed URL for end photo:", error.message);
+                else signedUrls.signed_end_photo_url = data.signedUrl;
+              }
+              return { ...task, ...signedUrls };
+            })
+          );
+          setTasks(tasksWithSignedUrls);
+        } else {
+          setTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching demand details:", error);
+        showError("Falha ao carregar detalhes da demanda.");
+        setDemand(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
   }, [id]);
 
@@ -241,10 +250,27 @@ const DemandDetails = () => {
       showError("Erro ao adicionar tarefa.");
     } else {
       setNewTaskTitle("");
-      fetchData();
+      // Re-fetch data after adding a task
+      const event = new Event('refetch');
+      window.dispatchEvent(event);
     }
   };
   
+  useEffect(() => {
+    const handleRefetch = () => {
+      if (id) {
+        // A bit of a hack to re-trigger the main useEffect
+        const currentId = id;
+        const navigate = (p: string) => window.history.replaceState(null, '', p);
+        navigate(`/demands/`);
+        setTimeout(() => navigate(`/demands/${currentId}`), 0);
+      }
+    };
+    window.addEventListener('refetch', handleRefetch);
+    return () => window.removeEventListener('refetch', handleRefetch);
+  }, [id]);
+
+
   const totalDuration = tasks.reduce((acc, task) => {
     if (task.started_at && task.completed_at) {
       const start = new Date(task.started_at).getTime();
@@ -260,8 +286,7 @@ const DemandDetails = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const formatAddress = (loc: any) => {
-    if (!loc) return "";
+  const formatAddress = (loc: Location) => {
     return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
   };
 
@@ -271,14 +296,16 @@ const DemandDetails = () => {
   };
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
-  if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
+  if (!demand) return <div className="p-4 text-center">Demanda não encontrada ou erro ao carregar.</div>;
 
   return (
     <div className="space-y-6">
-      <Link to={`/locations/${demand.location_id}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-        <ArrowLeft className="h-4 w-4" />
-        Voltar para {demand.locations?.client_name || 'Local'}
-      </Link>
+      {demand.location_id && (
+        <Link to={`/locations/${demand.location_id}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+          <ArrowLeft className="h-4 w-4" />
+          Voltar para {demand.locations?.client_name || 'Local'}
+        </Link>
+      )}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
@@ -315,7 +342,10 @@ const DemandDetails = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={fetchData} />
+              <TaskItem key={task.id} task={task} onUpdate={() => {
+                  const event = new Event('refetch');
+                  window.dispatchEvent(event);
+              }} />
             ))}
           </div>
           <div className="flex gap-2 pt-4">
