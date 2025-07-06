@@ -3,3 +3,11 @@ export interface Employee {
   name: string;
   role: string;
 }
+
+export type UserRole = "admin" | "supervisor" | "user";
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  role: UserRole;
+}
