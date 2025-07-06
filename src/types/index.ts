@@ -65,4 +65,8 @@ export interface Task {
   presumed_hours: number | null;
   worker_id: string | null;
   profiles?: Profile | null; // Para o JOIN com os dados do trabalhador
+  start_latitude?: number | null;
+  start_longitude?: number | null;
+  end_latitude?: number | null;
+  end_longitude?: number | null;
 }

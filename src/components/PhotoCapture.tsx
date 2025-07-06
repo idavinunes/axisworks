@@ -1,10 +1,15 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Camera, X, RefreshCw } from 'lucide-react';
+import { Camera, X, RefreshCw, Loader2 } from 'lucide-react';
 import { showError } from '@/utils/toast';
 
+interface Geolocation {
+  latitude: number;
+  longitude: number;
+}
+
 interface PhotoCaptureProps {
-  onPhotoTaken: (dataUrl: string) => void;
+  onPhotoTaken: (dataUrl: string, location: Geolocation | null) => void;
   onCancel: () => void;
 }
 
@@ -13,8 +18,11 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [location, setLocation] = useState<Geolocation | null>(null);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(true);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -25,7 +33,7 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
   }, []);
 
   const startCamera = useCallback(async () => {
-    stopCamera(); // Garante que qualquer câmera anterior seja parada
+    stopCamera();
     setCapturedImage(null);
     
     try {
@@ -36,23 +44,46 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
         videoRef.current.srcObject = mediaStream;
       }
       streamRef.current = mediaStream;
-      setError(null);
+      setCameraError(null);
       setIsCameraReady(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
       const errorMessage = "Não foi possível acessar a câmera. Verifique as permissões no seu navegador.";
-      setError(errorMessage);
+      setCameraError(errorMessage);
       showError(errorMessage);
       setIsCameraReady(false);
     }
   }, [stopCamera]);
 
+  const getLocation = useCallback(() => {
+    setIsFetchingLocation(true);
+    setLocationError(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setIsFetchingLocation(false);
+      },
+      (err) => {
+        console.error("Error getting location:", err);
+        const errorMessage = "Não foi possível obter a localização. Verifique as permissões.";
+        setLocationError(errorMessage);
+        showError(errorMessage);
+        setIsFetchingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
   useEffect(() => {
     startCamera();
+    getLocation();
     return () => {
       stopCamera();
     };
-  }, [startCamera, stopCamera]);
+  }, [startCamera, getLocation, stopCamera]);
 
   const handleTakePhoto = () => {
     if (videoRef.current && canvasRef.current && streamRef.current) {
@@ -74,15 +105,17 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
 
   const handleConfirm = () => {
     if (capturedImage) {
-      onPhotoTaken(capturedImage);
+      onPhotoTaken(capturedImage, location);
     }
   };
+
+  const isButtonDisabled = !isCameraReady || !!cameraError || isFetchingLocation || !!locationError;
 
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative w-full max-w-md bg-muted rounded-lg overflow-hidden aspect-video flex items-center justify-center">
-        {error ? (
-          <div className="p-4 text-center text-destructive">{error}</div>
+        {cameraError ? (
+          <div className="p-4 text-center text-destructive">{cameraError}</div>
         ) : (
           <>
             <video 
@@ -99,6 +132,7 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
         )}
         <canvas ref={canvasRef} className="hidden" />
       </div>
+      {locationError && <p className="text-sm text-destructive text-center">{locationError}</p>}
       <div className="flex flex-wrap justify-center gap-2">
         {capturedImage ? (
           <>
@@ -114,8 +148,13 @@ const PhotoCapture = ({ onPhotoTaken, onCancel }: PhotoCaptureProps) => {
             <Button onClick={onCancel} variant="outline">
               <X className="mr-2 h-4 w-4" /> Cancelar
             </Button>
-            <Button onClick={handleTakePhoto} disabled={!isCameraReady || !!error}>
-              <Camera className="mr-2 h-4 w-4" /> Tirar Foto
+            <Button onClick={handleTakePhoto} disabled={isButtonDisabled}>
+              {isFetchingLocation ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="mr-2 h-4 w-4" />
+              )}
+              {isFetchingLocation ? 'Obtendo GPS...' : 'Tirar Foto'}
             </Button>
           </>
         )}

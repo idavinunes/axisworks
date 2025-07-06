@@ -24,6 +24,11 @@ import { useDemandDetails } from "@/hooks/useDemandDetails";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+interface Geolocation {
+  latitude: number;
+  longitude: number;
+}
+
 const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, onUpdate: () => void, demandStartDate?: string | null, profile: Profile | null }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [photoAction, setPhotoAction] = useState<'start' | 'end' | null>(null);
@@ -40,8 +45,14 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
 
   const canStartTask = isScheduledForToday();
 
-  const handlePhotoTaken = async (photoDataUrl: string) => {
+  const handlePhotoTaken = async (photoDataUrl: string, location: Geolocation | null) => {
     if (!photoAction || !profile) return;
+
+    if (!location) {
+      showError("Não foi possível obter a localização. A foto não será salva.");
+      setIsPhotoDialogOpen(false);
+      return;
+    }
 
     const response = await fetch(photoDataUrl);
     const blob = await response.blob();
@@ -67,12 +78,16 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
         started_at: new Date().toISOString(),
         worker_id: profile.id,
         status: 'in_progress',
+        start_latitude: location.latitude,
+        start_longitude: location.longitude,
       };
     } else {
       updatePayload = {
         end_photo_url: functionData.path,
         completed_at: new Date().toISOString(),
         status: 'pending_approval',
+        end_latitude: location.latitude,
+        end_longitude: location.longitude,
       };
     }
 
@@ -141,6 +156,22 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
     }
   };
 
+  const renderMapLink = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return null;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a href={`https://www.google.com/maps?q=${lat},${lng}`} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="icon"><MapPin className="h-4 w-4 text-blue-500" /></Button>
+            </a>
+          </TooltipTrigger>
+          <TooltipContent><p>Ver localização no mapa</p></TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-2 p-3 border rounded-md">
       <div className="flex items-center gap-3">
@@ -180,8 +211,8 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
                 <DialogContent>
                   <DialogHeader><DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle></DialogHeader>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {task.signed_start_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Início</h3><img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" /></div>)}
-                    {task.signed_end_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Fim</h3><img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" /></div>)}
+                    {task.signed_start_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Início</h3><img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-md" />{renderMapLink(task.start_latitude, task.start_longitude)}</div>)}
+                    {task.signed_end_photo_url && (<div><h3 className="font-semibold mb-2">Foto de Fim</h3><img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-md" />{renderMapLink(task.end_latitude, task.end_longitude)}</div>)}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -206,7 +237,7 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
       )}
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Capturar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle><DialogDescription>Centralize o objeto da foto e clique em "Tirar Foto".</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Capturar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle><DialogDescription>Centralize o objeto da foto e clique em "Tirar Foto". A sua localização será registrada.</DialogDescription></DialogHeader>
           <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
         </DialogContent>
       </Dialog>
