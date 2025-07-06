@@ -17,9 +17,20 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Users, PlusCircle, ListChecks } from "lucide-react";
+import { Users, PlusCircle, ListChecks, Trash2 } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -70,6 +81,20 @@ const Index = () => {
     }
   };
 
+  const handleDeleteDemand = async (demandId: string) => {
+    const { error } = await supabase.functions.invoke('delete-demand', {
+      body: { demand_id: demandId },
+    });
+
+    if (error) {
+      showError(`Falha ao deletar demanda: ${error.message}`);
+      console.error(error);
+    } else {
+      showSuccess("Demanda deletada com sucesso!");
+      fetchDemands();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -112,13 +137,34 @@ const Index = () => {
           {demands.length > 0 ? (
             <ul className="space-y-2">
               {demands.map((demand) => (
-                <li key={demand.id} className="border p-3 rounded-md hover:bg-accent">
-                  <Link to={`/demands/${demand.id}`} className="flex justify-between items-center">
+                <li key={demand.id} className="border p-3 rounded-md flex justify-between items-center hover:bg-accent">
+                  <Link to={`/demands/${demand.id}`} className="flex-grow flex justify-between items-center mr-4">
                     <span>{demand.title}</span>
                     <span className="text-xs text-muted-foreground">
                       {new Date(demand.created_at).toLocaleDateString()}
                     </span>
                   </Link>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive flex-shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. Isso irá deletar permanentemente a demanda "{demand.title}", todas as suas tarefas e fotos associadas.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
+                          Deletar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </li>
               ))}
             </ul>
