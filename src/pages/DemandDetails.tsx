@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign } from "lucide-react";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
@@ -216,6 +218,8 @@ const DemandDetails = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [newStartDate, setNewStartDate] = useState<Date | undefined>();
 
   const forceRefresh = () => setRefreshKey(k => k + 1);
 
@@ -227,6 +231,9 @@ const DemandDetails = () => {
         const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
         if (demandError) throw demandError;
         setDemand(demandData);
+        if (demandData?.start_date) {
+          setNewStartDate(new Date(demandData.start_date + 'T00:00:00'));
+        }
 
         const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*, profiles!left(*)").eq("demand_id", id).order("created_at", { ascending: true });
         if (tasksError) throw tasksError;
@@ -269,6 +276,23 @@ const DemandDetails = () => {
       showSuccess("Tarefa adicionada com sucesso!");
       setNewTaskTitle("");
       setIsTaskDialogOpen(false);
+      forceRefresh();
+    }
+  };
+
+  const handleUpdateDate = async () => {
+    if (!newStartDate || !demand) {
+      showError("Por favor, selecione uma nova data.");
+      return;
+    }
+    const formattedDate = newStartDate.toISOString().split('T')[0];
+    const { error } = await supabase.from('demands').update({ start_date: formattedDate }).eq('id', demand.id);
+
+    if (error) {
+      showError("Falha ao atualizar a data.");
+    } else {
+      showSuccess("Data da demanda atualizada com sucesso!");
+      setIsDatePickerOpen(false);
       forceRefresh();
     }
   };
@@ -321,6 +345,34 @@ const DemandDetails = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span>Data de Início:</span>
+              <span>{demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "PPP", { locale: ptBR }) : "Não definida"}</span>
+            </div>
+            {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={newStartDate}
+                    onSelect={setNewStartDate}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                  <div className="p-2 border-t">
+                    <Button onClick={handleUpdateDate} className="w-full" size="sm">Salvar Data</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
           <div className="space-y-2">
             {tasks.map((task) => (
               <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} profile={profile} />
