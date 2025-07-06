@@ -12,6 +12,7 @@ import PhotoCapture from "@/components/PhotoCapture";
 import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatAddress, generateMapsUrl } from "@/utils/address";
 
 const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
@@ -270,16 +271,6 @@ const DemandDetails = () => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
-  };
-
-  const formatAddress = (loc: Location | null) => {
-    if (!loc) return "Endereço não disponível";
-    return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
-  };
-
-  const generateMapsUrl = (loc: Location) => {
-    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
   };
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;

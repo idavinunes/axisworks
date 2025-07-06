@@ -13,14 +13,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatAddress, generateMapsUrl } from "@/utils/address";
 
 const Locations = () => {
   const { user } = useSession();
   const [locations, setLocations] = useState<Location[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    id: "",
+  const [formData, setFormData] = useState<Partial<Location>>({
     client_name: "",
     street_name: "",
     street_number: "",
@@ -57,7 +57,7 @@ const Locations = () => {
   };
 
   const resetForm = () => {
-    setFormData({ id: "", client_name: "", street_name: "", street_number: "", unit_number: "", city: "", state: "", zip_code: "" });
+    setFormData({ client_name: "", street_name: "", street_number: "", unit_number: "", city: "", state: "", zip_code: "" });
   };
 
   const handleOpenAddDialog = () => {
@@ -82,8 +82,8 @@ const Locations = () => {
   };
 
   const handleFormSubmit = async () => {
-    if (!user || !formData.client_name.trim() || !formData.street_name.trim()) {
-      showError("Preencha pelo menos o nome do cliente e da rua.");
+    if (!user || !formData.client_name?.trim()) {
+      showError("O nome do cliente é obrigatório.");
       return;
     }
 
@@ -120,15 +120,6 @@ const Locations = () => {
     }
   };
 
-  const formatAddress = (loc: Location) => {
-    return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
-  };
-
-  const generateMapsUrl = (loc: Location) => {
-    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
-  };
-
   return (
     <div className="space-y-6">
       <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
@@ -152,31 +143,31 @@ const Locations = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2 col-span-2">
                   <Label htmlFor="client_name">Nome do Cliente</Label>
-                  <Input id="client_name" value={formData.client_name} onChange={handleInputChange} />
+                  <Input id="client_name" value={formData.client_name || ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="street_name">Nome da Rua/Avenida</Label>
-                  <Input id="street_name" value={formData.street_name} onChange={handleInputChange} />
+                  <Input id="street_name" value={formData.street_name || ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="street_number">Número</Label>
-                  <Input id="street_number" value={formData.street_number} onChange={handleInputChange} />
+                  <Input id="street_number" value={formData.street_number || ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit_number">Apto/Unidade (Opcional)</Label>
-                  <Input id="unit_number" value={formData.unit_number} onChange={handleInputChange} />
+                  <Input id="unit_number" value={formData.unit_number || ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" value={formData.city} onChange={handleInputChange} />
+                  <Input id="city" value={formData.city || ""} onChange={handleInputChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="state">Estado (Sigla)</Label>
-                  <Input id="state" value={formData.state} onChange={handleInputChange} maxLength={2} />
+                  <Input id="state" value={formData.state || ""} onChange={handleInputChange} maxLength={2} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="zip_code">CEP (ZIP Code)</Label>
-                  <Input id="zip_code" value={formData.zip_code} onChange={handleInputChange} />
+                  <Input id="zip_code" value={formData.zip_code || ""} onChange={handleInputChange} />
                 </div>
               </div>
             </div>

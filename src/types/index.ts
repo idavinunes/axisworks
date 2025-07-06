@@ -16,12 +16,12 @@ export interface Location {
   id: string;
   user_id: string;
   client_name: string;
-  street_number: string;
-  street_name: string;
+  street_number: string | null;
+  street_name: string | null;
   unit_number?: string | null;
-  city: string;
-  state: string;
-  zip_code: string;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
   created_at: string;
   demands?: Demand[];
 }

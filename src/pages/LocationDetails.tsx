@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { PlusCircle, ArrowLeft, Trash2, MapPin, Map } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatAddress, generateMapsUrl } from "@/utils/address";
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -71,15 +72,6 @@ const LocationDetails = () => {
       showSuccess("Demanda deletada com sucesso!");
       fetchData();
     }
-  };
-
-  const formatAddress = (loc: Location) => {
-    return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
-  };
-
-  const generateMapsUrl = (loc: Location) => {
-    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
   };
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
