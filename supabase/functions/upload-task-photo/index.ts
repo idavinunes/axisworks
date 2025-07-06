@@ -27,7 +27,7 @@ async function isUserAuthorized(supabase: SupabaseClient, userId: string, taskId
   // Se não for admin/supervisor, verifica se está atribuído à demanda
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('demand_id, demands!inner(user_id, demand_workers!inner(worker_id))')
+    .select('demand_id, demands!inner(user_id, demand_workers!left(worker_id))') // CORREÇÃO: de !inner para !left
     .eq('id', taskId)
     .single();
 
