@@ -372,7 +372,7 @@ const DemandDetails = () => {
                   <DialogDescription>
                     Preencha os detalhes da nova tarefa.
                   </DialogDescription>
-                </Header>
+                </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="task-title">Título da Tarefa</Label>
