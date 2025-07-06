@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Location, Demand } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -77,6 +77,11 @@ const LocationDetails = () => {
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!location) return <div className="p-4 text-center">Local não encontrado.</div>;
+
+  const totalLocationSeconds = demands.reduce((total, demand) => {
+    return total + calculateTotalDuration(demand.tasks);
+  }, 0);
+  const formattedTotalLocationTime = formatTotalTime(totalLocationSeconds);
 
   return (
     <div className="space-y-6">
@@ -200,6 +205,15 @@ const LocationDetails = () => {
             </p>
           )}
         </CardContent>
+        {demands.length > 0 && totalLocationSeconds > 0 && (
+          <CardFooter className="pt-4 border-t flex justify-end">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>Tempo Total no Local:</span>
+              <span className="font-bold text-base">{formattedTotalLocationTime}</span>
+            </div>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );
