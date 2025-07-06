@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { useUsers } from "@/hooks/useUsers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const roleIcons: Record<UserRole, React.ReactNode> = {
   admin: <Shield className="h-5 w-5 text-red-500" />,
@@ -161,8 +162,8 @@ const EmployeeManagement = () => {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-        <ArrowLeft className="h-4 w-4" />
+      <Link to="/" className={cn(buttonVariants({ variant: "outline" }), "self-start")}>
+        <ArrowLeft className="mr-2 h-4 w-4" />
         Voltar para o Início
       </Link>
       <div className="flex justify-between items-center">

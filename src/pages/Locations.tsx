@@ -128,8 +128,8 @@ const Locations = () => {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-        <ArrowLeft className="h-4 w-4" />
+      <Link to="/" className={cn(buttonVariants({ variant: "outline" }), "self-start")}>
+        <ArrowLeft className="mr-2 h-4 w-4" />
         Voltar para o Início
       </Link>
       <div className="flex justify-between items-center">

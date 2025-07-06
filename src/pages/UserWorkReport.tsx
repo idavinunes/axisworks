@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { showError } from "@/utils/toast";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -11,6 +11,7 @@ import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useUserWorkReport } from "@/hooks/useUserWorkReport";
+import { cn } from "@/lib/utils";
 
 const UserWorkReport = () => {
   const [date, setDate] = useState<DateRange | undefined>({
@@ -26,8 +27,8 @@ const UserWorkReport = () => {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-        <ArrowLeft className="h-4 w-4" />
+      <Link to="/" className={cn(buttonVariants({ variant: "outline" }), "self-start")}>
+        <ArrowLeft className="mr-2 h-4 w-4" />
         Voltar para o Painel
       </Link>
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">

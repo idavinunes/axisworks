@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Demand, Task, Profile, TaskStatus, MaterialCost } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -401,8 +401,8 @@ const DemandDetails = () => {
   return (
     <div className="space-y-6">
       {demand.locations && (
-        <Link to={`/locations/${demand.locations.id}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-          <ArrowLeft className="h-4 w-4" />
+        <Link to={`/locations/${demand.locations.id}`} className={cn(buttonVariants({ variant: "outline" }), "self-start")}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Voltar para os Detalhes do Local
         </Link>
       )}
