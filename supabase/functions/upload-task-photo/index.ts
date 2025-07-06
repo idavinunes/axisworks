@@ -7,8 +7,8 @@ const corsHeaders = {
 }
 
 // Função para verificar se o usuário está autorizado a gerenciar a tarefa
-async function isUserAuthorized(supabase: SupabaseClient, userId: string, taskId: string) {
-  // Primeiro, verifica se o usuário é admin ou supervisor
+async function isUserAuthorized(supabase: SupabaseClient, userId: string, taskId: string): Promise<boolean> {
+  // 1. Verifica se o usuário é admin ou supervisor
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
@@ -16,7 +16,7 @@ async function isUserAuthorized(supabase: SupabaseClient, userId: string, taskId
     .single();
 
   if (profileError) {
-    console.error('Erro ao buscar perfil:', profileError.message);
+    console.error(`Erro de autorização (verificação de perfil): ${profileError.message}`);
     return false;
   }
 
@@ -24,31 +24,44 @@ async function isUserAuthorized(supabase: SupabaseClient, userId: string, taskId
     return true;
   }
 
-  // Se não for admin/supervisor, verifica se está atribuído à demanda
-  const { data: task, error: taskError } = await supabase
+  // 2. Obtém o demand_id da tarefa
+  const { data: taskData, error: taskError } = await supabase
     .from('tasks')
-    .select('demand_id, demands!inner(user_id, demand_workers!left(worker_id))') // CORREÇÃO: de !inner para !left
+    .select('demand_id')
     .eq('id', taskId)
     .single();
 
-  if (taskError || !task) {
-    console.error('Erro ao buscar tarefa ou tarefa não encontrada:', taskError?.message);
+  if (taskError || !taskData) {
+    console.error(`Erro de autorização (tarefa não encontrada): ${taskError?.message || 'Tarefa não encontrada'}`);
     return false;
   }
 
-  // Verifica se o usuário é o criador da demanda
-  if (task.demands.user_id === userId) {
+  // 3. Obtém o dono da demanda e os trabalhadores atribuídos
+  const { data: demandData, error: demandError } = await supabase
+    .from('demands')
+    .select('user_id, demand_workers(worker_id)')
+    .eq('id', taskData.demand_id)
+    .single();
+  
+  if (demandError || !demandData) {
+    console.error(`Erro de autorização (demanda não encontrada): ${demandError?.message || 'Demanda não encontrada'}`);
+    return false;
+  }
+
+  // 4. Verifica se o usuário é o dono da demanda
+  if (demandData.user_id === userId) {
     return true;
   }
 
-  // Verifica se o usuário é um trabalhador atribuído
-  const isAssigned = task.demands.demand_workers.some(worker => worker.worker_id === userId);
-  if (isAssigned) {
+  // 5. Verifica se o usuário é um trabalhador atribuído
+  if (demandData.demand_workers && demandData.demand_workers.some(worker => worker.worker_id === userId)) {
     return true;
   }
 
+  // 6. Se nenhuma das opções acima, o usuário não está autorizado
   return false;
 }
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
