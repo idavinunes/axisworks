@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import { Skeleton } from "./components/ui/skeleton";
 import { ThemeProvider } from "./components/ThemeProvider";
+import PwaUpdater from "./components/PwaUpdater";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <SessionProvider>
+            <PwaUpdater />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
