@@ -33,6 +33,7 @@ const Locations = () => {
 
   const [hasJoined, setHasJoined] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   const fetchLocations = async () => {
     if (!user) return;
@@ -50,10 +51,10 @@ const Locations = () => {
   };
 
   useEffect(() => {
-    if (user && hasJoined) {
+    if (user) {
       fetchLocations();
     }
-  }, [user, hasJoined]);
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -124,42 +125,24 @@ const Locations = () => {
     }
   };
 
-  const handleJoinDialogAction = (join: boolean) => {
-    setIsJoinDialogOpen(false);
-    if (join) {
-      setHasJoined(true);
-      showSuccess("Bem-vindo à equipe!");
+  const handleCardClick = (location: Location) => {
+    if (hasJoined) {
+      navigate(`/locations/${location.id}`);
     } else {
-      navigate("/");
+      setSelectedLocation(location);
+      setIsJoinDialogOpen(true);
     }
   };
 
-  if (!hasJoined) {
-    return (
-      <>
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-          <h1 className="text-2xl font-bold mb-4">Gerenciar Locais da Equipe</h1>
-          <p className="text-muted-foreground mb-6 max-w-md">Clique abaixo para entrar na equipe e começar a gerenciar os locais de trabalho e suas demandas.</p>
-          <Button onClick={() => setIsJoinDialogOpen(true)}>Entrar na Equipe</Button>
-        </div>
-
-        <AlertDialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Você deseja fazer parte dessa equipe?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Ao confirmar, você terá acesso para visualizar e gerenciar os locais de trabalho.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => handleJoinDialogAction(false)}>Não</AlertDialogCancel>
-              <AlertDialogAction onClick={() => handleJoinDialogAction(true)}>Sim</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    );
-  }
+  const handleJoinDialogAction = (join: boolean) => {
+    setIsJoinDialogOpen(false);
+    if (join && selectedLocation) {
+      setHasJoined(true);
+      showSuccess("Bem-vindo à equipe!");
+      navigate(`/locations/${selectedLocation.id}`);
+    }
+    setSelectedLocation(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -222,70 +205,87 @@ const Locations = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {locations.length > 0 ? (
           locations.map((location) => (
-            <Link to={`/locations/${location.id}`} key={location.id}>
-              <Card className="h-full hover:bg-accent">
-                <CardHeader className="flex flex-row items-start justify-between">
-                  <CardTitle>{location.client_name}</CardTitle>
-                  <div className="flex items-center -mt-2 -mr-2">
-                    <Button variant="ghost" size="icon" className="hover:bg-accent hover:text-primary" onClick={(e) => { e.preventDefault(); handleOpenEditDialog(location); }}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog onOpenChange={(e) => e.stopPropagation()} >
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(e) => e.preventDefault()}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent onClick={(e) => e.preventDefault()}>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação não pode ser desfeita e irá deletar o local e todas as suas demandas associadas.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteLocation(location.id)} className="bg-destructive hover:bg-destructive/90">
-                            Deletar
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+            <Card 
+              key={location.id} 
+              className="h-full hover:bg-accent cursor-pointer"
+              onClick={() => handleCardClick(location)}
+            >
+              <CardHeader className="flex flex-row items-start justify-between">
+                <CardTitle>{location.client_name}</CardTitle>
+                <div className="flex items-center -mt-2 -mr-2">
+                  <Button variant="ghost" size="icon" className="hover:bg-accent hover:text-primary" onClick={(e) => { e.stopPropagation(); handleOpenEditDialog(location); }}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <AlertDialog onOpenChange={(e) => e.stopPropagation()} >
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita e irá deletar o local e todas as suas demandas associadas.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteLocation(location.id)} className="bg-destructive hover:bg-destructive/90">
+                          Deletar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+                    <p>{formatAddress(location)}</p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
-                    <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
-                      <p>{formatAddress(location)}</p>
-                    </div>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <a
-                            href={generateMapsUrl(location)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}
-                          >
-                            <Map className="h-4 w-4" />
-                          </a>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Abrir no Google Maps</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={generateMapsUrl(location)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}
+                        >
+                          <Map className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Abrir no Google Maps</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </CardContent>
+            </Card>
           ))
         ) : (
           <p className="col-span-full text-center text-muted-foreground py-8">Nenhum local cadastrado ainda.</p>
         )}
       </div>
+
+      <AlertDialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Você deseja fazer parte dessa equipe?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ao confirmar, você terá acesso para visualizar e gerenciar os locais de trabalho.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => handleJoinDialogAction(false)}>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleJoinDialogAction(true)}>Sim</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
