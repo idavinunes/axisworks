@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Demand, Task, Location } from "@/types";
@@ -193,55 +193,55 @@ const DemandDetails = () => {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) {
-        setLoading(false);
-        return;
+  const fetchData = useCallback(async () => {
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
+
+      if (demandError) throw demandError;
+      setDemand(demandData);
+
+      const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
+
+      if (tasksError) throw tasksError;
+
+      if (tasksData) {
+        const tasksWithSignedUrls = await Promise.all(
+          tasksData.map(async (task) => {
+            const signedUrls: Partial<Task> = {};
+            if (task.start_photo_url) {
+              const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
+              if (error) console.error("Error creating signed URL for start photo:", error.message);
+              else signedUrls.signed_start_photo_url = data.signedUrl;
+            }
+            if (task.end_photo_url) {
+              const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
+              if (error) console.error("Error creating signed URL for end photo:", error.message);
+              else signedUrls.signed_end_photo_url = data.signedUrl;
+            }
+            return { ...task, ...signedUrls };
+          })
+        );
+        setTasks(tasksWithSignedUrls);
+      } else {
+        setTasks([]);
       }
-      setLoading(true);
-      try {
-        const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
-
-        if (demandError) throw demandError;
-        setDemand(demandData);
-
-        const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
-
-        if (tasksError) throw tasksError;
-
-        if (tasksData) {
-          const tasksWithSignedUrls = await Promise.all(
-            tasksData.map(async (task) => {
-              const signedUrls: Partial<Task> = {};
-              if (task.start_photo_url) {
-                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
-                if (error) console.error("Error creating signed URL for start photo:", error.message);
-                else signedUrls.signed_start_photo_url = data.signedUrl;
-              }
-              if (task.end_photo_url) {
-                const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
-                if (error) console.error("Error creating signed URL for end photo:", error.message);
-                else signedUrls.signed_end_photo_url = data.signedUrl;
-              }
-              return { ...task, ...signedUrls };
-            })
-          );
-          setTasks(tasksWithSignedUrls);
-        } else {
-          setTasks([]);
-        }
-      } catch (error) {
-        console.error("Error fetching demand details:", error);
-        showError("Falha ao carregar detalhes da demanda.");
-        setDemand(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    } catch (error) {
+      console.error("Error fetching demand details:", error);
+      showError("Falha ao carregar detalhes da demanda.");
+      setDemand(null);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim() || !id) return;
@@ -250,26 +250,9 @@ const DemandDetails = () => {
       showError("Erro ao adicionar tarefa.");
     } else {
       setNewTaskTitle("");
-      // Re-fetch data after adding a task
-      const event = new Event('refetch');
-      window.dispatchEvent(event);
+      await fetchData();
     }
   };
-  
-  useEffect(() => {
-    const handleRefetch = () => {
-      if (id) {
-        // A bit of a hack to re-trigger the main useEffect
-        const currentId = id;
-        const navigate = (p: string) => window.history.replaceState(null, '', p);
-        navigate(`/demands/`);
-        setTimeout(() => navigate(`/demands/${currentId}`), 0);
-      }
-    };
-    window.addEventListener('refetch', handleRefetch);
-    return () => window.removeEventListener('refetch', handleRefetch);
-  }, [id]);
-
 
   const totalDuration = tasks.reduce((acc, task) => {
     if (task.started_at && task.completed_at) {
@@ -342,10 +325,7 @@ const DemandDetails = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={() => {
-                  const event = new Event('refetch');
-                  window.dispatchEvent(event);
-              }} />
+              <TaskItem key={task.id} task={task} onUpdate={fetchData} />
             ))}
           </div>
           <div className="flex gap-2 pt-4">
