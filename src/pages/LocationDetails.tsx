@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Location, Demand, Profile } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
@@ -20,6 +21,9 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSession } from "@/contexts/SessionContext";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useLocationDetails } from "@/hooks/useLocationDetails";
+import { useWorkers } from "@/hooks/useWorkers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const AssignWorkerDialog = ({ demand, workers, onSave, open, onOpenChange }: { demand: Demand, workers: Profile[], onSave: () => void, open: boolean, onOpenChange: (open: boolean) => void }) => {
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set());
@@ -44,7 +48,6 @@ const AssignWorkerDialog = ({ demand, workers, onSave, open, onOpenChange }: { d
   };
 
   const handleSave = async () => {
-    // Deleta todas as atribuições existentes para esta demanda
     const { error: deleteError } = await supabase
       .from('demand_workers')
       .delete()
@@ -55,7 +58,6 @@ const AssignWorkerDialog = ({ demand, workers, onSave, open, onOpenChange }: { d
       return;
     }
 
-    // Insere as novas atribuições
     if (selectedWorkerIds.size > 0) {
       const newAssignments = Array.from(selectedWorkerIds).map(worker_id => ({
         demand_id: demand.id,
@@ -104,55 +106,16 @@ const AssignWorkerDialog = ({ demand, workers, onSave, open, onOpenChange }: { d
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { profile } = useSession();
-  const [location, setLocation] = useState<Location | null>(null);
-  const [demands, setDemands] = useState<Demand[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: location, isLoading, error } = useLocationDetails(id);
+  const { data: workers = [] } = useWorkers();
+
   const [isDemandDialogOpen, setIsDemandDialogOpen] = useState(false);
   const [newDemandTitle, setNewDemandTitle] = useState("");
   const [newDemandDate, setNewDemandDate] = useState<Date | undefined>();
-  const [workers, setWorkers] = useState<Profile[]>([]);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const fetchData = async () => {
-    if (!id) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("locations")
-      .select("*, demands(*, tasks(*), demand_workers(worker_id))")
-      .eq("id", id)
-      .order('start_date', { foreignTable: 'demands', ascending: false })
-      .single();
-
-    if (error || !data) {
-      showError("Local não encontrado.");
-      setLocation(null);
-    } else {
-      setLocation(data);
-      setDemands(data.demands || []);
-    }
-    setLoading(false);
-  };
-
-  const fetchWorkers = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'user');
-    if (error) {
-      showError("Erro ao buscar lista de trabalhadores.");
-    } else {
-      setWorkers(data || []);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    if (profile?.role === 'admin' || profile?.role === 'supervisor') {
-      fetchWorkers();
-    }
-  }, [id, profile, refreshKey]);
 
   const handleCreateDemand = async () => {
     if (!newDemandTitle.trim() || !id || !location) {
@@ -180,7 +143,7 @@ const LocationDetails = () => {
       setNewDemandTitle("");
       setNewDemandDate(undefined);
       setIsDemandDialogOpen(false);
-      setRefreshKey(k => k + 1);
+      queryClient.invalidateQueries({ queryKey: ['locationDetails', id] });
     }
   };
 
@@ -193,7 +156,7 @@ const LocationDetails = () => {
       showError(`Falha ao deletar demanda: ${error.message}`);
     } else {
       showSuccess("Demanda deletada com sucesso!");
-      setRefreshKey(k => k + 1);
+      queryClient.invalidateQueries({ queryKey: ['locationDetails', id] });
     }
   };
 
@@ -202,9 +165,11 @@ const LocationDetails = () => {
     setIsAssignDialogOpen(true);
   };
 
-  if (loading) return <div className="p-4 text-center">Carregando...</div>;
+  if (isLoading) return <div className="p-4 text-center">Carregando...</div>;
+  if (error) return <div className="p-4 text-center text-destructive">Erro: {error.message}</div>;
   if (!location) return <div className="p-4 text-center">Local não encontrado.</div>;
 
+  const demands = location.demands || [];
   const totalLocationSeconds = demands.reduce((total, demand) => {
     return total + calculateTotalDuration(demand.tasks);
   }, 0);
@@ -385,7 +350,7 @@ const LocationDetails = () => {
           workers={workers}
           open={isAssignDialogOpen}
           onOpenChange={setIsAssignDialogOpen}
-          onSave={() => setRefreshKey(k => k + 1)}
+          onSave={() => queryClient.invalidateQueries({ queryKey: ['locationDetails', id] })}
         />
       )}
     </div>

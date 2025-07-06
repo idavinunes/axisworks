@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, Briefcase, CheckSquare, AlertTriangle, BarChart3, Clock, DollarSign } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
-import { supabase } from "@/integrations/supabase/client";
 import StatCard from "@/components/dashboard/StatCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
 
 interface AdminDashboardStats {
   current: {
@@ -32,40 +31,7 @@ interface UserDashboardStats {
 
 const Index = () => {
   const { profile } = useSession();
-  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
-  const [userStats, setUserStats] = useState<UserDashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!profile) return;
-
-    const fetchStats = async () => {
-      setLoading(true);
-      setError(null);
-
-      if (profile.role === 'admin' || profile.role === 'supervisor') {
-        const { data, error } = await supabase.functions.invoke("get-dashboard-stats");
-        if (error) {
-          setError("Falha ao carregar as estatísticas do dashboard.");
-          console.error(error);
-        } else {
-          setAdminStats(data);
-        }
-      } else {
-        const { data, error } = await supabase.functions.invoke("get-user-dashboard-stats");
-        if (error) {
-          setError("Falha ao carregar suas estatísticas.");
-          console.error(error);
-        } else {
-          setUserStats(data);
-        }
-      }
-      setLoading(false);
-    };
-
-    fetchStats();
-  }, [profile]);
+  const { data: stats, isLoading, error } = useDashboardStats(profile);
 
   const renderSkeletons = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -84,74 +50,80 @@ const Index = () => {
     </div>
   );
 
-  const renderAdminDashboard = () => (
-    <>
-      {adminStats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard 
-            title="Total de Usuários"
-            value={adminStats.current.totalUsers}
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            changeDescription=""
-          />
-          <StatCard 
-            title="Demandas no Mês"
-            value={adminStats.current.totalDemands}
-            icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}
-            change={adminStats.changes.totalDemands}
-          />
-          <StatCard 
-            title="Tarefas Concluídas no Mês"
-            value={adminStats.current.completedTasks}
-            icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
-            change={adminStats.changes.completedTasks}
-          />
-          <StatCard 
-            title="Demandas Atrasadas"
-            value={adminStats.current.delayedDemands}
-            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
-            change={adminStats.changes.delayedDemands}
-          />
-        </div>
-      )}
-    </>
-  );
+  const renderAdminDashboard = () => {
+    const adminStats = stats as AdminDashboardStats;
+    return (
+      <>
+        {adminStats && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard 
+              title="Total de Usuários"
+              value={adminStats.current.totalUsers}
+              icon={<Users className="h-4 w-4 text-muted-foreground" />}
+              changeDescription=""
+            />
+            <StatCard 
+              title="Demandas no Mês"
+              value={adminStats.current.totalDemands}
+              icon={<Briefcase className="h-4 w-4 text-muted-foreground" />}
+              change={adminStats.changes.totalDemands}
+            />
+            <StatCard 
+              title="Tarefas Concluídas no Mês"
+              value={adminStats.current.completedTasks}
+              icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
+              change={adminStats.changes.completedTasks}
+            />
+            <StatCard 
+              title="Demandas Atrasadas"
+              value={adminStats.current.delayedDemands}
+              icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+              change={adminStats.changes.delayedDemands}
+            />
+          </div>
+        )}
+      </>
+    );
+  };
 
-  const renderUserDashboard = () => (
-    <>
-      {userStats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard 
-            title="Valor a Receber (Semana)"
-            value={`$ ${userStats.totalCostWeek.toFixed(2)}`}
-            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-          />
-          <StatCard 
-            title="Valor a Receber (Mês)"
-            value={`$ ${userStats.totalCostMonth.toFixed(2)}`}
-            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-          />
-          <StatCard 
-            title="Horas Trabalhadas (Mês)"
-            value={`${userStats.totalHoursMonth.toFixed(2).replace('.', ',')}h`}
-            icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-          />
-          <StatCard 
-            title="Tarefas Concluídas (Mês)"
-            value={userStats.completedTasksMonth}
-            icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
-          />
-        </div>
-      )}
-    </>
-  );
+  const renderUserDashboard = () => {
+    const userStats = stats as UserDashboardStats;
+    return (
+      <>
+        {userStats && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard 
+              title="Valor a Receber (Semana)"
+              value={`$ ${userStats.totalCostWeek.toFixed(2)}`}
+              icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            />
+            <StatCard 
+              title="Valor a Receber (Mês)"
+              value={`$ ${userStats.totalCostMonth.toFixed(2)}`}
+              icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            />
+            <StatCard 
+              title="Horas Trabalhadas (Mês)"
+              value={`${userStats.totalHoursMonth.toFixed(2).replace('.', ',')}h`}
+              icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+            />
+            <StatCard 
+              title="Tarefas Concluídas (Mês)"
+              value={userStats.completedTasksMonth}
+              icon={<CheckSquare className="h-4 w-4 text-muted-foreground" />}
+            />
+          </div>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl sm:text-3xl font-bold">Painel de Controle</h1>
       
-      {loading ? renderSkeletons() : error ? (
-        <p className="text-red-500">{error}</p>
+      {isLoading ? renderSkeletons() : error ? (
+        <p className="text-red-500">Falha ao carregar estatísticas: {error.message}</p>
       ) : (
         profile?.role === 'admin' || profile?.role === 'supervisor' ? renderAdminDashboard() : renderUserDashboard()
       )}

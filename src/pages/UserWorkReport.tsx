@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ArrowLeft, CalendarIcon, User, Clock, DollarSign, CheckSquare } from "lucide-react";
@@ -11,55 +10,19 @@ import { DateRange } from "react-day-picker";
 import { addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-
-interface UserReportData {
-  user_id: string;
-  full_name: string;
-  total_hours: number;
-  total_cost: number;
-  task_count: number;
-}
+import { useUserWorkReport } from "@/hooks/useUserWorkReport";
 
 const UserWorkReport = () => {
-  const [report, setReport] = useState<UserReportData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [date, setDate] = useState<DateRange | undefined>({
     from: addDays(new Date(), -29),
     to: new Date(),
   });
+  const { data: report = [], isLoading, error } = useUserWorkReport(date);
 
-  useEffect(() => {
-    const fetchReport = async () => {
-      if (!date?.from || !date?.to) return;
-
-      setLoading(true);
-
-      // Ajusta a data de início para o começo do dia
-      const adjustedStartDate = new Date(date.from);
-      adjustedStartDate.setHours(0, 0, 0, 0);
-
-      // Ajusta a data final para o fim do dia
-      const adjustedEndDate = new Date(date.to);
-      adjustedEndDate.setHours(23, 59, 59, 999);
-
-      const { data, error } = await supabase.functions.invoke("get-user-work-report", {
-        body: {
-          startDate: adjustedStartDate.toISOString(),
-          endDate: adjustedEndDate.toISOString(),
-        },
-      });
-
-      if (error) {
-        showError("Falha ao carregar o relatório.");
-        console.error(error);
-      } else {
-        setReport(data.report || []);
-      }
-      setLoading(false);
-    };
-
-    fetchReport();
-  }, [date]);
+  if (error) {
+    showError("Falha ao carregar o relatório.");
+    console.error(error);
+  }
 
   return (
     <div className="space-y-6">
@@ -107,7 +70,7 @@ const UserWorkReport = () => {
         </Popover>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => (
             <Card key={i}>

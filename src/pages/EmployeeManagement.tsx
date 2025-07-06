@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -12,7 +13,8 @@ import { showSuccess, showError } from "@/utils/toast";
 import { useSession } from "@/contexts/SessionContext";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useUsers } from "@/hooks/useUsers";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const roleIcons: Record<UserRole, React.ReactNode> = {
   admin: <Shield className="h-5 w-5 text-red-500" />,
@@ -22,32 +24,18 @@ const roleIcons: Record<UserRole, React.ReactNode> = {
 
 const EmployeeManagement = () => {
   const { profile: currentUserProfile } = useSession();
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const queryClient = useQueryClient();
+  const { data: profiles = [], isLoading: isLoadingProfiles, error: profilesError } = useUsers();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
 
-  // Form state
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("user");
   const [hourlyCost, setHourlyCost] = useState("");
-
-  const fetchProfiles = async () => {
-    const { data, error } = await supabase.functions.invoke("get-users-with-status");
-    if (error) {
-      showError("Falha ao carregar a lista de usuários.");
-    } else {
-      setProfiles(data.users || []);
-    }
-  };
-
-  useEffect(() => {
-    if (currentUserProfile) {
-      fetchProfiles();
-    }
-  }, [currentUserProfile]);
 
   const resetForm = () => {
     setFullName("");
@@ -92,19 +80,19 @@ const EmployeeManagement = () => {
       showError("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     const { error } = await supabase.functions.invoke("create-user", {
       body: { full_name: fullName, email, password, role, hourly_cost: parseFloat(hourlyCost) || 0 },
     });
 
-    setIsLoading(false);
+    setIsSubmitting(false);
     if (error) {
       showError(`Falha ao criar usuário: ${error.message}`);
     } else {
       showSuccess("Usuário criado e aguardando aprovação!");
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       handleDialogClose();
-      fetchProfiles();
     }
   };
 
@@ -113,7 +101,7 @@ const EmployeeManagement = () => {
       showError("O nome completo é obrigatório.");
       return;
     }
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     const { error } = await supabase.functions.invoke("update-user", {
       body: {
@@ -125,27 +113,27 @@ const EmployeeManagement = () => {
       },
     });
 
-    setIsLoading(false);
+    setIsSubmitting(false);
     if (error) {
       showError(`Falha ao atualizar usuário: ${error.message}`);
     } else {
       showSuccess("Usuário atualizado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       handleDialogClose();
-      fetchProfiles();
     }
   };
 
   const handleApproveUser = async (userId: string) => {
-    setIsLoading(true);
+    setIsSubmitting(true);
     const { error } = await supabase.functions.invoke("approve-user", {
       body: { user_id: userId },
     });
-    setIsLoading(false);
+    setIsSubmitting(false);
     if (error) {
       showError(`Falha ao aprovar usuário: ${error.message}`);
     } else {
       showSuccess("Usuário aprovado com sucesso!");
-      fetchProfiles();
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     }
   };
 
@@ -217,15 +205,21 @@ const EmployeeManagement = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? "Salvando..." : "Salvar"}
+            <Button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {profiles.length > 0 ? (
+        {isLoadingProfiles ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-1/2 mt-2" /></CardContent></Card>
+          ))
+        ) : profilesError ? (
+          <p className="col-span-full text-center text-destructive">Erro ao carregar usuários: {profilesError.message}</p>
+        ) : profiles.length > 0 ? (
           profiles.map((profile) => (
             <Card key={profile.id}>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -254,7 +248,7 @@ const EmployeeManagement = () => {
                   </div>
                 )}
                 {profile.status === 'pending' && (currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'supervisor') && (
-                  <Button className="w-full mt-4" size="sm" onClick={() => handleApproveUser(profile.id)} disabled={isLoading}>
+                  <Button className="w-full mt-4" size="sm" onClick={() => handleApproveUser(profile.id)} disabled={isSubmitting}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Aprovar Usuário
                   </Button>

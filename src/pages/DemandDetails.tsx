@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Demand, Task, Profile, TaskStatus, MaterialCost } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
@@ -12,14 +13,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil, Hourglass, BadgeCheck, ShoppingCart } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon, User, DollarSign, Pencil, Hourglass, BadgeCheck, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatAddress, generateMapsUrl } from "@/utils/address";
+import { formatAddress } from "@/utils/address";
 import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSession } from "@/contexts/SessionContext";
+import { useDemandDetails } from "@/hooks/useDemandDetails";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, onUpdate: () => void, demandStartDate?: string | null, profile: Profile | null }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
@@ -214,87 +216,23 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
 const DemandDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { profile, user } = useSession();
-  const [demand, setDemand] = useState<Demand | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [materialCosts, setMaterialCosts] = useState<MaterialCost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  
-  // State for dialogs
+  const queryClient = useQueryClient();
+  const { data, isLoading, error, refetch } = useDemandDetails(id);
+
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCostDialogOpen, setIsCostDialogOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-  // State for forms
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newCostDescription, setNewCostDescription] = useState("");
   const [newCostAmount, setNewCostAmount] = useState("");
   const [newStartDate, setNewStartDate] = useState<Date | undefined>();
 
-  const forceRefresh = () => setRefreshKey(k => k + 1);
-
   useEffect(() => {
-    const fetchData = async () => {
-      if (!id) { setLoading(false); return; }
-      setLoading(true);
-      try {
-        // Step 1: Fetch the main demand data and its related location
-        const { data: demandData, error: demandError } = await supabase
-          .from("demands")
-          .select("*, locations(*)")
-          .eq("id", id)
-          .single();
-
-        if (demandError) throw demandError;
-        
-        setDemand(demandData);
-        if (demandData?.start_date) {
-          setNewStartDate(new Date(demandData.start_date + 'T00:00:00'));
-        }
-
-        // Step 2: Fetch material costs in a separate query for robustness
-        const { data: costsData, error: costsError } = await supabase
-          .from("material_costs")
-          .select("*")
-          .eq("demand_id", id);
-
-        if (costsError) {
-          console.error("Could not fetch material costs, maybe the table wasn't created?", costsError);
-          setMaterialCosts([]); // Default to empty array on error
-        } else {
-          setMaterialCosts(costsData || []);
-        }
-
-        // Step 3: Fetch tasks
-        const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*, profiles!left(*)").eq("demand_id", id).order("created_at", { ascending: true });
-        if (tasksError) throw tasksError;
-
-        const signedTasks = await Promise.all(
-          (tasksData || []).map(async (task) => {
-            let signed_start_photo_url = null;
-            if (task.start_photo_url) {
-              const { data } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
-              signed_start_photo_url = data?.signedUrl;
-            }
-            let signed_end_photo_url = null;
-            if (task.end_photo_url) {
-              const { data } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
-              signed_end_photo_url = data?.signedUrl;
-            }
-            return { ...task, signed_start_photo_url, signed_end_photo_url };
-          })
-        );
-        setTasks(signedTasks);
-
-      } catch (error) {
-        console.error("Error fetching demand details:", error);
-        showError("Falha ao carregar detalhes da demanda.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id, refreshKey]);
+    if (data?.demand?.start_date) {
+      setNewStartDate(new Date(data.demand.start_date + 'T00:00:00'));
+    }
+  }, [data?.demand?.start_date]);
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim() || !id) {
@@ -308,7 +246,7 @@ const DemandDetails = () => {
       showSuccess("Tarefa adicionada com sucesso!");
       setNewTaskTitle("");
       setIsTaskDialogOpen(false);
-      forceRefresh();
+      refetch();
     }
   };
 
@@ -337,7 +275,7 @@ const DemandDetails = () => {
       setNewCostDescription("");
       setNewCostAmount("");
       setIsCostDialogOpen(false);
-      forceRefresh();
+      refetch();
     }
   };
 
@@ -347,29 +285,32 @@ const DemandDetails = () => {
       showError("Falha ao deletar custo.");
     } else {
       showSuccess("Custo deletado com sucesso.");
-      forceRefresh();
+      refetch();
     }
   };
 
   const handleUpdateDate = async () => {
-    if (!newStartDate || !demand) {
+    if (!newStartDate || !data?.demand) {
       showError("Por favor, selecione uma nova data.");
       return;
     }
     const formattedDate = newStartDate.toISOString().split('T')[0];
-    const { error } = await supabase.from('demands').update({ start_date: formattedDate }).eq('id', demand.id);
+    const { error } = await supabase.from('demands').update({ start_date: formattedDate }).eq('id', data.demand.id);
 
     if (error) {
       showError("Falha ao atualizar a data.");
     } else {
       showSuccess("Data da demanda atualizada com sucesso!");
       setIsDatePickerOpen(false);
-      forceRefresh();
+      refetch();
     }
   };
 
-  if (loading) return <div className="p-4 text-center">Carregando...</div>;
-  if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
+  if (isLoading) return <div className="p-4 text-center">Carregando...</div>;
+  if (error) return <div className="p-4 text-center text-destructive">Erro: {error.message}</div>;
+  if (!data) return <div className="p-4 text-center">Demanda não encontrada.</div>;
+
+  const { demand, tasks, materialCosts } = data;
 
   const laborTotalSeconds = calculateTotalDuration(tasks.filter(t => t.status === 'approved'));
   const laborTotalCost = tasks.reduce((acc, task) => {
@@ -439,7 +380,7 @@ const DemandDetails = () => {
           </div>
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} profile={profile} />
+              <TaskItem key={task.id} task={task} onUpdate={refetch} demandStartDate={demand.start_date} profile={profile} />
             ))}
           </div>
           {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
@@ -457,7 +398,6 @@ const DemandDetails = () => {
         </CardContent>
       </Card>
 
-      {/* Card de Custos de Material */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="space-y-1">
@@ -471,7 +411,7 @@ const DemandDetails = () => {
                 <DialogHeader>
                   <DialogTitle>Adicionar Custo ou Sobra</DialogTitle>
                   <DialogDescription>Descreva o item e seu valor. Use um valor negativo para sobras (crédito).</DialogDescription>
-                </DialogHeader>
+                </Header>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2"><Label htmlFor="cost-desc">Descrição</Label><Input id="cost-desc" value={newCostDescription} onChange={(e) => setNewCostDescription(e.target.value)} placeholder="Ex: Rolo de fio 100m" /></div>
                   <div className="space-y-2"><Label htmlFor="cost-amount">Valor ($)</Label><Input id="cost-amount" type="number" value={newCostAmount} onChange={(e) => setNewCostAmount(e.target.value)} placeholder="Ex: 150.00 ou -25.00" /></div>
