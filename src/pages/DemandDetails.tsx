@@ -40,28 +40,40 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
   const handlePhotoTaken = async (photoDataUrl: string) => {
     if (!photoAction || !profile) return;
 
+    // 1. Converte data URL para blob
     const response = await fetch(photoDataUrl);
     const blob = await response.blob();
-    const fileName = `${task.id}/${photoAction}_${Date.now()}.jpg`;
-    
-    const { data, error: uploadError } = await supabase.storage.from('task-photos').upload(fileName, blob);
 
-    if (uploadError) {
-      showError("Falha ao enviar foto.");
+    // 2. Cria FormData
+    const formData = new FormData();
+    formData.append('photo', blob, 'photo.jpg');
+    formData.append('taskId', task.id);
+    formData.append('photoAction', photoAction);
+
+    // 3. Invoca a edge function
+    const { data: functionData, error: functionError } = await supabase.functions.invoke('upload-task-photo', {
+      body: formData,
+    });
+
+    if (functionError || !functionData.path) {
+      const errorMessage = functionError?.message || "Falha ao enviar foto.";
+      showError(errorMessage);
+      console.error("Function error:", functionError);
       setIsPhotoDialogOpen(false);
       return;
     }
     
+    // 4. Atualiza o registro da tarefa com o caminho retornado pela função
     let updatePayload: Partial<Task> = {};
     if (photoAction === 'start') {
       updatePayload = {
-        start_photo_url: data.path,
+        start_photo_url: functionData.path,
         started_at: new Date().toISOString(),
         worker_id: profile.id,
       };
     } else {
       updatePayload = {
-        end_photo_url: data.path,
+        end_photo_url: functionData.path,
         completed_at: new Date().toISOString(),
         is_completed: true,
       };
