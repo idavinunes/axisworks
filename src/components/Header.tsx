@@ -16,12 +16,13 @@ const Header = () => {
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     queryClient.clear(); // Limpa o cache do react-query para remover dados do usuário
-    if (error) {
+    
+    // Ignora o erro "Auth session missing!", pois o usuário já está efetivamente deslogado.
+    if (error && error.message !== 'Auth session missing!') {
       console.error("Error logging out:", error);
       showError(`Erro ao sair: ${error.message}`);
     }
-    // A navegação agora é tratada pelo ProtectedRoute,
-    // que reage à mudança no estado da sessão.
+    // A navegação é tratada pelo ProtectedRoute, que reage à mudança no estado da sessão.
   };
 
   return (
