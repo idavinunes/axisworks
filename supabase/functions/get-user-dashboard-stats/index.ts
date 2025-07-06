@@ -39,12 +39,12 @@ serve(async (req) => {
     if (profileError) throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
     const hourlyCost = profile?.hourly_cost || 0;
 
-    // Buscar todas as tarefas completas do usuário no mês corrente
+    // Buscar todas as tarefas aprovadas do usuário no mês corrente
     const { data: tasks, error: tasksError } = await supabase
       .from('tasks')
       .select('started_at, completed_at')
       .eq('worker_id', user.id)
-      .eq('is_completed', true)
+      .eq('status', 'approved')
       .gte('completed_at', startOfMonth.toISOString());
 
     if (tasksError) throw new Error(`Erro ao buscar tarefas: ${tasksError.message}`);
