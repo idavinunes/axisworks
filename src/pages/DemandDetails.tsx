@@ -10,16 +10,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon } from "lucide-react";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon, CalendarIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
 import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
+const TaskItem = ({ task, onUpdate, demandStartDate }: { task: Task, onUpdate: () => void, demandStartDate?: string | null }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [photoAction, setPhotoAction] = useState<'start' | 'end' | null>(null);
   const [isViewingPhotos, setIsViewingPhotos] = useState(false);
+
+  const isScheduledForToday = () => {
+    if (!demandStartDate) return true; // Se não houver data, permite iniciar
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const scheduledDate = new Date(demandStartDate + 'T00:00:00');
+    scheduledDate.setHours(0, 0, 0, 0);
+    return today.getTime() === scheduledDate.getTime();
+  };
+
+  const canStartTask = isScheduledForToday();
 
   const handlePhotoTaken = async (photoDataUrl: string) => {
     if (!photoAction) return;
@@ -172,9 +185,22 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
       <span className="flex-grow font-medium">{task.title}</span>
       <div className="flex items-center gap-2">
         {!task.started_at && (
-          <Button size="sm" onClick={() => { setPhotoAction('start'); setIsPhotoDialogOpen(true); }}>
-            <Camera className="mr-2 h-4 w-4" /> Iniciar
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-block">
+                  <Button size="sm" onClick={() => { setPhotoAction('start'); setIsPhotoDialogOpen(true); }} disabled={!canStartTask}>
+                    <Camera className="mr-2 h-4 w-4" /> Iniciar
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              {!canStartTask && (
+                <TooltipContent>
+                  <p>A tarefa só pode ser iniciada na data agendada.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         )}
         {task.started_at && !task.completed_at && (
           <Button size="sm" variant="destructive" onClick={() => { setPhotoAction('end'); setIsPhotoDialogOpen(true); }}>
@@ -347,6 +373,12 @@ const DemandDetails = () => {
           <div className="flex justify-between items-start">
             <div className="flex-grow">
               <CardTitle className="text-2xl">{demand.title}</CardTitle>
+              {demand.start_date && (
+                <CardDescription className="flex items-center gap-2 pt-1 text-sm">
+                  <CalendarIcon className="h-4 w-4" />
+                  Agendado para: {format(new Date(demand.start_date + 'T00:00:00'), "PPP", { locale: ptBR })}
+                </CardDescription>
+              )}
               {demand.locations && (
                 <CardDescription className="flex items-center gap-2 pt-2 text-base">
                   <div className="flex items-start gap-2 flex-grow">
@@ -378,7 +410,7 @@ const DemandDetails = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             {tasks.map((task) => (
-              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} />
+              <TaskItem key={task.id} task={task} onUpdate={forceRefresh} demandStartDate={demand.start_date} />
             ))}
           </div>
           <div className="flex justify-end gap-2 pt-4">

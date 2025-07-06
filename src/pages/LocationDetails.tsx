@@ -9,11 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, ArrowLeft, Trash2, MapPin, Map, Clock } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { PlusCircle, ArrowLeft, Trash2, MapPin, Map, Clock, CalendarIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
 import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +26,7 @@ const LocationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [isDemandDialogOpen, setIsDemandDialogOpen] = useState(false);
   const [newDemandTitle, setNewDemandTitle] = useState("");
+  const [newDemandDate, setNewDemandDate] = useState<Date | undefined>();
 
   const fetchData = async () => {
     if (!id) return;
@@ -30,6 +35,7 @@ const LocationDetails = () => {
       .from("locations")
       .select("*, demands(*, tasks(*))")
       .eq("id", id)
+      .order('start_date', { foreignTable: 'demands', ascending: false })
       .single();
 
     if (error || !data) {
@@ -47,16 +53,30 @@ const LocationDetails = () => {
   }, [id]);
 
   const handleCreateDemand = async () => {
-    if (!newDemandTitle.trim() || !id || !location) return;
+    if (!newDemandTitle.trim() || !id || !location) {
+      showError("O título da demanda é obrigatório.");
+      return;
+    }
+    if (!newDemandDate) {
+      showError("A data de início da demanda é obrigatória.");
+      return;
+    }
+
     const { error } = await supabase
       .from("demands")
-      .insert({ title: newDemandTitle, user_id: location.user_id, location_id: id });
+      .insert({ 
+        title: newDemandTitle, 
+        user_id: location.user_id, 
+        location_id: id,
+        start_date: newDemandDate.toISOString().split('T')[0] // Formato YYYY-MM-DD
+      });
 
     if (error) {
       showError("Falha ao criar demanda.");
     } else {
       showSuccess("Demanda criada com sucesso!");
       setNewDemandTitle("");
+      setNewDemandDate(undefined);
       setIsDemandDialogOpen(false);
       fetchData();
     }
@@ -133,17 +153,44 @@ const LocationDetails = () => {
                 <DialogHeader>
                   <DialogTitle>Criar Nova Demanda</DialogTitle>
                   <DialogDescription>
-                    Dê um nome para a nova demanda neste local.
+                    Dê um nome e uma data de início para a nova demanda.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <Label htmlFor="demand-title">Título da Demanda</Label>
-                  <Input
-                    id="demand-title"
-                    value={newDemandTitle}
-                    onChange={(e) => setNewDemandTitle(e.target.value)}
-                    placeholder="Ex: Instalação do cliente XPTO"
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="demand-title">Título da Demanda</Label>
+                    <Input
+                      id="demand-title"
+                      value={newDemandTitle}
+                      onChange={(e) => setNewDemandTitle(e.target.value)}
+                      placeholder="Ex: Instalação do cliente XPTO"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="demand-date">Data de Início</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !newDemandDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newDemandDate ? format(newDemandDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={newDemandDate}
+                          onSelect={setNewDemandDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button onClick={handleCreateDemand}>Salvar</Button>
@@ -171,7 +218,7 @@ const LocationDetails = () => {
                     </Link>
                     <div className="flex items-center flex-shrink-0">
                       <span className="text-xs text-muted-foreground mr-2">
-                        {new Date(demand.created_at).toLocaleDateString()}
+                        {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
                       </span>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

@@ -13,7 +13,7 @@ export interface Profile {
 }
 
 export interface Location {
-  id: string;
+  id:string;
   user_id: string;
   client_name: string;
   street_number: string | null;
@@ -35,6 +35,7 @@ export interface Demand {
   tasks?: Task[];
   location_id: string | null;
   locations: Location | null; // This can be simplified later if not needed
+  start_date?: string | null;
 }
 
 export interface Task {
