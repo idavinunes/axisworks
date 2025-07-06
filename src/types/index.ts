@@ -42,8 +42,11 @@ export interface Task {
   demand_id: string;
   title: string;
   is_completed: boolean;
-  duration_seconds: number;
-  photo_url: string | null;
+  start_photo_url: string | null;
+  end_photo_url: string | null;
+  started_at: string | null;
+  completed_at: string | null;
   created_at: string;
-  signed_photo_url?: string;
+  signed_start_photo_url?: string;
+  signed_end_photo_url?: string;
 }

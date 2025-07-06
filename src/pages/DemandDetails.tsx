@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Demand, Task, Location } from "@/types";
@@ -6,99 +6,69 @@ import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Timer, Camera, ArrowLeft, Trash2, MapPin, Map } from "lucide-react";
+import { PlusCircle, Camera, ArrowLeft, Trash2, MapPin, Map, CheckCircle2, Clock, Image as ImageIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
-  const [isTiming, setIsTiming] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(task.duration_seconds);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
-  const [isTakingNewPhoto, setIsTakingNewPhoto] = useState(false);
-
-  useEffect(() => {
-    if (isTiming) {
-      startTimeRef.current = Date.now();
-      intervalRef.current = setInterval(() => {
-        const newElapsedTime = task.duration_seconds + Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setElapsedTime(newElapsedTime);
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isTiming, task.duration_seconds]);
-
-  const handleToggleTiming = async () => {
-    if (isTiming) {
-      // Stopping timer
-      const duration = task.duration_seconds + Math.floor((Date.now() - startTimeRef.current) / 1000);
-      const { error } = await supabase.from('tasks').update({ duration_seconds: duration }).eq('id', task.id);
-      if (error) showError("Erro ao salvar tempo.");
-      else onUpdate();
-    }
-    setIsTiming(!isTiming);
-  };
-
-  const handleToggleComplete = async () => {
-    if (isTiming) {
-      showError("Pare o cronômetro antes de completar a tarefa.");
-      return;
-    }
-    if (!task.is_completed && !task.photo_url) {
-      showError("É necessário adicionar uma foto antes de concluir a tarefa.");
-      return;
-    }
-    const { error } = await supabase.from('tasks').update({ is_completed: !task.is_completed }).eq('id', task.id);
-    if (error) showError("Erro ao atualizar tarefa.");
-    else onUpdate();
-  };
+  const [photoAction, setPhotoAction] = useState<'start' | 'end' | null>(null);
+  const [isViewingPhotos, setIsViewingPhotos] = useState(false);
 
   const handlePhotoTaken = async (photoDataUrl: string) => {
+    if (!photoAction) return;
+
     const response = await fetch(photoDataUrl);
     const blob = await response.blob();
-    const fileName = `${task.id}/${Date.now()}.jpg`;
+    const fileName = `${task.id}/${photoAction}_${Date.now()}.jpg`;
     
     const { data, error: uploadError } = await supabase.storage.from('task-photos').upload(fileName, blob);
 
     if (uploadError) {
       showError("Falha ao enviar foto.");
       console.error(uploadError);
+      setIsPhotoDialogOpen(false);
       return;
     }
     
-    const { error: updateError } = await supabase.from('tasks').update({ photo_url: data.path }).eq('id', task.id);
+    let updatePayload = {};
+    if (photoAction === 'start') {
+      updatePayload = {
+        start_photo_url: data.path,
+        started_at: new Date().toISOString(),
+      };
+    } else { // 'end'
+      updatePayload = {
+        end_photo_url: data.path,
+        completed_at: new Date().toISOString(),
+        is_completed: true,
+      };
+    }
+
+    const { error: updateError } = await supabase.from('tasks').update(updatePayload).eq('id', task.id);
     
     if (updateError) {
-      showError("Erro ao salvar caminho da foto.");
+      showError("Erro ao salvar dados da tarefa.");
     } else {
-      showSuccess("Foto salva com sucesso!");
+      showSuccess(`Foto de ${photoAction === 'start' ? 'início' : 'fim'} salva com sucesso!`);
       onUpdate();
     }
+    setIsPhotoDialogOpen(false);
   };
 
   const handleDeleteTask = async () => {
-    if (task.photo_url) {
-        const pathParts = task.photo_url.split('/');
-        const folder = pathParts.slice(0, -1).join('/');
+    if (task.start_photo_url) {
         const { data: listData, error: listError } = await supabase.storage
             .from('task-photos')
-            .list(folder, { limit: 100 });
+            .list(task.id, { limit: 100 });
 
         if (listError) {
             showError("Erro ao listar fotos para deletar.");
         } else if (listData && listData.length > 0) {
-            const filesToRemove = listData.map((file) => `${folder}/${file.name}`);
+            const filesToRemove = listData.map((file) => `${task.id}/${file.name}`);
             await supabase.storage.from('task-photos').remove(filesToRemove);
         }
     }
@@ -112,68 +82,79 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
     }
   };
 
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+  const calculateDuration = () => {
+    if (!task.started_at || !task.completed_at) return "Em andamento";
+    const start = new Date(task.started_at).getTime();
+    const end = new Date(task.completed_at).getTime();
+    const diffSeconds = Math.floor((end - start) / 1000);
+    
+    const hours = Math.floor(diffSeconds / 3600);
+    const minutes = Math.floor((diffSeconds % 3600) / 60);
+    const seconds = diffSeconds % 60;
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
 
+  const renderStatus = () => {
+    if (task.is_completed) {
+      return (
+        <div className="flex flex-col items-center text-green-600">
+          <CheckCircle2 className="h-5 w-5" />
+          <span className="text-xs font-semibold">Concluída</span>
+          <span className="text-xs font-mono">{calculateDuration()}</span>
+        </div>
+      );
+    }
+    if (task.started_at) {
+      return (
+        <div className="flex flex-col items-center text-blue-600">
+          <Clock className="h-5 w-5" />
+          <span className="text-xs font-semibold">Em Andamento</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center text-muted-foreground">
+        <Clock className="h-5 w-5" />
+        <span className="text-xs font-semibold">Pendente</span>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex items-center gap-2 p-3 border rounded-md">
-      <Checkbox id={`task-${task.id}`} checked={task.is_completed} onCheckedChange={handleToggleComplete} />
-      <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.is_completed ? 'line-through text-muted-foreground' : ''}`}>
-        {task.title}
-      </label>
+    <div className="flex items-center gap-4 p-3 border rounded-md">
+      <div className="w-20 text-center">{renderStatus()}</div>
+      <span className="flex-grow font-medium">{task.title}</span>
       <div className="flex items-center gap-2">
-        <span className="text-sm font-mono w-24 text-center">{formatTime(elapsedTime)}</span>
-        <Button variant={isTiming ? "destructive" : "outline"} size="sm" onClick={handleToggleTiming} disabled={task.is_completed}>
-          <Timer className="mr-2 h-4 w-4" /> {isTiming ? "Parar" : "Iniciar"}
-        </Button>
-        <Dialog open={isPhotoDialogOpen} onOpenChange={(open) => {
-          setIsPhotoDialogOpen(open);
-          if (!open) {
-            setIsTakingNewPhoto(false);
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm" disabled={task.is_completed}>
-              <Camera className="mr-2 h-4 w-4" /> {task.photo_url ? "Ver/Trocar" : "Foto"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Foto da Tarefa: {task.title}</DialogTitle>
-            </DialogHeader>
-            {isTakingNewPhoto ? (
-              <PhotoCapture 
-                onPhotoTaken={async (dataUrl) => {
-                  await handlePhotoTaken(dataUrl);
-                  setIsTakingNewPhoto(false);
-                }} 
-                onCancel={() => setIsTakingNewPhoto(false)} 
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-4 pt-4">
-                {task.signed_photo_url ? (
-                  <img src={task.signed_photo_url} alt="Foto da tarefa" className="rounded-lg max-h-80 w-auto mx-auto" />
-                ) : (
-                  <div className="my-4 p-8 text-center text-muted-foreground bg-muted rounded-lg w-full">
-                    <Camera className="mx-auto h-12 w-12 mb-2" />
-                    Nenhuma foto foi tirada para esta tarefa ainda.
-                  </div>
-                )}
-                <div className="flex w-full justify-end gap-2 mt-4">
-                  <Button variant="outline" onClick={() => setIsPhotoDialogOpen(false)}>Fechar</Button>
-                  <Button onClick={() => setIsTakingNewPhoto(true)}>
-                    <Camera className="mr-2 h-4 w-4" /> 
-                    {task.signed_photo_url ? "Tirar Nova Foto" : "Tirar Foto"}
-                  </Button>
+        {!task.started_at && (
+          <Button size="sm" onClick={() => { setPhotoAction('start'); setIsPhotoDialogOpen(true); }}>
+            <Camera className="mr-2 h-4 w-4" /> Iniciar
+          </Button>
+        )}
+        {task.started_at && !task.completed_at && (
+          <Button size="sm" variant="destructive" onClick={() => { setPhotoAction('end'); setIsPhotoDialogOpen(true); }}>
+            <Camera className="mr-2 h-4 w-4" /> Finalizar
+          </Button>
+        )}
+        {(task.start_photo_url || task.end_photo_url) && (
+          <Dialog open={isViewingPhotos} onOpenChange={setIsViewingPhotos}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon"><ImageIcon className="h-4 w-4" /></Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Fotos da Tarefa: {task.title}</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Início</h3>
+                  {task.signed_start_photo_url ? <img src={task.signed_start_photo_url} alt="Foto de início" className="rounded-lg" /> : <p className="text-sm text-muted-foreground">Sem foto.</p>}
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Fim</h3>
+                  {task.signed_end_photo_url ? <img src={task.signed_end_photo_url} alt="Foto de fim" className="rounded-lg" /> : <p className="text-sm text-muted-foreground">Sem foto.</p>}
                 </div>
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
@@ -183,19 +164,24 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta ação não pode ser desfeita. Isso irá deletar permanentemente a tarefa e suas fotos associadas.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Esta ação irá deletar permanentemente a tarefa e suas fotos.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">
-                Deletar
-              </AlertDialogAction>
+              <AlertDialogAction onClick={handleDeleteTask} className="bg-destructive hover:bg-destructive/90">Deletar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tirar Foto de {photoAction === 'start' ? 'Início' : 'Fim'}</DialogTitle>
+            <DialogDescription>Tarefa: {task.title}</DialogDescription>
+          </DialogHeader>
+          <PhotoCapture onPhotoTaken={handlePhotoTaken} onCancel={() => setIsPhotoDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -210,11 +196,7 @@ const DemandDetails = () => {
   const fetchData = async () => {
     if (!id) return;
     setLoading(true);
-    const { data: demandData, error: demandError } = await supabase
-      .from("demands")
-      .select("*, locations(*)")
-      .eq("id", id)
-      .single();
+    const { data: demandData, error: demandError } = await supabase.from("demands").select("*, locations(*)").eq("id", id).single();
 
     if (demandError) {
       showError("Demanda não encontrada.");
@@ -223,11 +205,7 @@ const DemandDetails = () => {
     }
     setDemand(demandData);
 
-    const { data: tasksData, error: tasksError } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("demand_id", id)
-      .order("created_at", { ascending: true });
+    const { data: tasksData, error: tasksError } = await supabase.from("tasks").select("*").eq("demand_id", id).order("created_at", { ascending: true });
 
     if (tasksError) {
       showError("Erro ao buscar tarefas.");
@@ -235,17 +213,16 @@ const DemandDetails = () => {
     } else if (tasksData) {
       const tasksWithSignedUrls = await Promise.all(
         tasksData.map(async (task) => {
-          if (task.photo_url) {
-            const { data, error } = await supabase.storage
-              .from('task-photos')
-              .createSignedUrl(task.photo_url, 3600); // Link válido por 1 hora
-            if (error) {
-              console.error("Error creating signed url for", task.photo_url, error);
-              return { ...task, signed_photo_url: undefined };
-            }
-            return { ...task, signed_photo_url: data.signedUrl };
+          const signedUrls: Partial<Task> = {};
+          if (task.start_photo_url) {
+            const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.start_photo_url, 3600);
+            if (!error) signedUrls.signed_start_photo_url = data.signedUrl;
           }
-          return task;
+          if (task.end_photo_url) {
+            const { data, error } = await supabase.storage.from('task-photos').createSignedUrl(task.end_photo_url, 3600);
+            if (!error) signedUrls.signed_end_photo_url = data.signedUrl;
+          }
+          return { ...task, ...signedUrls };
         })
       );
       setTasks(tasksWithSignedUrls);
@@ -259,10 +236,7 @@ const DemandDetails = () => {
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim() || !id) return;
-    const { error } = await supabase
-      .from("tasks")
-      .insert({ demand_id: id, title: newTaskTitle });
-
+    const { error } = await supabase.from("tasks").insert({ demand_id: id, title: newTaskTitle });
     if (error) {
       showError("Erro ao adicionar tarefa.");
     } else {
@@ -271,7 +245,15 @@ const DemandDetails = () => {
     }
   };
   
-  const totalDuration = tasks.reduce((acc, task) => acc + task.duration_seconds, 0);
+  const totalDuration = tasks.reduce((acc, task) => {
+    if (task.started_at && task.completed_at) {
+      const start = new Date(task.started_at).getTime();
+      const end = new Date(task.completed_at).getTime();
+      return acc + Math.floor((end - start) / 1000);
+    }
+    return acc;
+  }, 0);
+
   const formatTotalTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -314,18 +296,11 @@ const DemandDetails = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <a
-                          href={generateMapsUrl(demand.locations)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}
-                        >
+                        <a href={generateMapsUrl(demand.locations)} target="_blank" rel="noopener noreferrer" className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}>
                           <Map className="h-4 w-4" />
                         </a>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Abrir no Google Maps</p>
-                      </TooltipContent>
+                      <TooltipContent><p>Abrir no Google Maps</p></TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </CardDescription>
@@ -344,15 +319,8 @@ const DemandDetails = () => {
             ))}
           </div>
           <div className="flex gap-2 pt-4">
-            <Input
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              placeholder="Digite o nome da nova tarefa"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-            />
-            <Button onClick={handleAddTask}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa
-            </Button>
+            <Input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Digite o nome da nova tarefa" onKeyDown={(e) => e.key === 'Enter' && handleAddTask()} />
+            <Button onClick={handleAddTask}><PlusCircle className="mr-2 h-4 w-4" /> Adicionar Tarefa</Button>
           </div>
         </CardContent>
       </Card>
