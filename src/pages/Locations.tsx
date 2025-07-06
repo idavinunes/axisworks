@@ -14,11 +14,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
+import { useLocations } from "@/hooks/useLocations";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Locations = () => {
   const { user, profile } = useSession();
   const navigate = useNavigate();
-  const [locations, setLocations] = useState<Location[]>([]);
+  const { data: locations = [], isLoading, error, refetch } = useLocations();
+
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Location>>({
@@ -34,26 +37,6 @@ const Locations = () => {
   const [hasJoined, setHasJoined] = useState(false);
   const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-
-  const fetchLocations = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from("locations")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      showError("Erro ao buscar locais.");
-    } else {
-      setLocations(data || []);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchLocations();
-    }
-  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -99,7 +82,7 @@ const Locations = () => {
       } else {
         showSuccess("Local atualizado com sucesso!");
         setIsFormDialogOpen(false);
-        fetchLocations();
+        refetch();
       }
     } else {
       const { id, ...insertData } = formData;
@@ -109,7 +92,7 @@ const Locations = () => {
       } else {
         showSuccess("Local adicionado com sucesso!");
         setIsFormDialogOpen(false);
-        fetchLocations();
+        refetch();
       }
     }
   };
@@ -120,7 +103,7 @@ const Locations = () => {
       showError("Erro ao deletar local. Verifique se ele não está sendo usado em alguma demanda.");
     } else {
       showSuccess("Local deletado com sucesso.");
-      fetchLocations();
+      refetch();
     }
   };
 
@@ -204,7 +187,16 @@ const Locations = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {locations.length > 0 ? (
+        {isLoading ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-3/4" /></CardHeader>
+              <CardContent><Skeleton className="h-4 w-full" /></CardContent>
+            </Card>
+          ))
+        ) : error ? (
+          <p className="col-span-full text-center text-destructive">Erro ao carregar locais: {error.message}</p>
+        ) : locations.length > 0 ? (
           locations.map((location) => (
             <Card 
               key={location.id} 
