@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 import { useSession } from "@/contexts/SessionContext";
 import { useDemandDetails } from "@/hooks/useDemandDetails";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, onUpdate: () => void, demandStartDate?: string | null, profile: Profile | null }) => {
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
@@ -411,7 +412,7 @@ const DemandDetails = () => {
                 <DialogHeader>
                   <DialogTitle>Adicionar Custo ou Sobra</DialogTitle>
                   <DialogDescription>Descreva o item e seu valor. Use um valor negativo para sobras (crédito).</DialogDescription>
-                </Header>
+                </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2"><Label htmlFor="cost-desc">Descrição</Label><Input id="cost-desc" value={newCostDescription} onChange={(e) => setNewCostDescription(e.target.value)} placeholder="Ex: Rolo de fio 100m" /></div>
                   <div className="space-y-2"><Label htmlFor="cost-amount">Valor ($)</Label><Input id="cost-amount" type="number" value={newCostAmount} onChange={(e) => setNewCostAmount(e.target.value)} placeholder="Ex: 150.00 ou -25.00" /></div>
