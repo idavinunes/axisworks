@@ -10,15 +10,16 @@ import { useSession } from "@/contexts/SessionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
 
 const Locations = () => {
   const { user } = useSession();
+  const navigate = useNavigate();
   const [locations, setLocations] = useState<Location[]>([]);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Location>>({
     client_name: "",
@@ -29,6 +30,9 @@ const Locations = () => {
     state: "",
     zip_code: "",
   });
+
+  const [hasJoined, setHasJoined] = useState(false);
+  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
 
   const fetchLocations = async () => {
     if (!user) return;
@@ -46,10 +50,10 @@ const Locations = () => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && hasJoined) {
       fetchLocations();
     }
-  }, [user]);
+  }, [user, hasJoined]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -63,7 +67,7 @@ const Locations = () => {
   const handleOpenAddDialog = () => {
     setIsEditing(false);
     resetForm();
-    setIsDialogOpen(true);
+    setIsFormDialogOpen(true);
   };
 
   const handleOpenEditDialog = (location: Location) => {
@@ -78,7 +82,7 @@ const Locations = () => {
       state: location.state || "",
       zip_code: location.zip_code || "",
     });
-    setIsDialogOpen(true);
+    setIsFormDialogOpen(true);
   };
 
   const handleFormSubmit = async () => {
@@ -94,7 +98,7 @@ const Locations = () => {
         showError("Erro ao atualizar local.");
       } else {
         showSuccess("Local atualizado com sucesso!");
-        setIsDialogOpen(false);
+        setIsFormDialogOpen(false);
         fetchLocations();
       }
     } else {
@@ -104,7 +108,7 @@ const Locations = () => {
         showError("Erro ao adicionar local.");
       } else {
         showSuccess("Local adicionado com sucesso!");
-        setIsDialogOpen(false);
+        setIsFormDialogOpen(false);
         fetchLocations();
       }
     }
@@ -120,6 +124,43 @@ const Locations = () => {
     }
   };
 
+  const handleJoinDialogAction = (join: boolean) => {
+    setIsJoinDialogOpen(false);
+    if (join) {
+      setHasJoined(true);
+      showSuccess("Bem-vindo à equipe!");
+    } else {
+      navigate("/");
+    }
+  };
+
+  if (!hasJoined) {
+    return (
+      <>
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+          <h1 className="text-2xl font-bold mb-4">Gerenciar Locais da Equipe</h1>
+          <p className="text-muted-foreground mb-6 max-w-md">Clique abaixo para entrar na equipe e começar a gerenciar os locais de trabalho e suas demandas.</p>
+          <Button onClick={() => setIsJoinDialogOpen(true)}>Entrar na Equipe</Button>
+        </div>
+
+        <AlertDialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Você deseja fazer parte dessa equipe?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ao confirmar, você terá acesso para visualizar e gerenciar os locais de trabalho.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => handleJoinDialogAction(false)}>Não</AlertDialogCancel>
+              <AlertDialogAction onClick={() => handleJoinDialogAction(true)}>Sim</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
@@ -128,7 +169,7 @@ const Locations = () => {
       </Link>
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Locais de Trabalho</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={handleOpenAddDialog}>
               <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Local
