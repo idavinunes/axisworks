@@ -33,6 +33,7 @@ export interface Demand {
   location_id: string | null;
   locations: Location | null; // This can be simplified later if not needed
   start_date?: string | null;
+  demand_workers: { worker_id: string }[];
 }
 
 export interface Task {

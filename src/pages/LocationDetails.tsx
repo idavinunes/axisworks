@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Location, Demand } from "@/types";
+import { Location, Demand, Profile } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { PlusCircle, ArrowLeft, Trash2, MapPin, Map, Clock, CalendarIcon } from "lucide-react";
+import { PlusCircle, ArrowLeft, Trash2, MapPin, Map, Clock, CalendarIcon, Users } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatAddress, generateMapsUrl } from "@/utils/address";
@@ -19,6 +19,87 @@ import { calculateTotalDuration, formatTotalTime } from "@/utils/time";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSession } from "@/contexts/SessionContext";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const AssignWorkerDialog = ({ demand, workers, onSave, open, onOpenChange }: { demand: Demand, workers: Profile[], onSave: () => void, open: boolean, onOpenChange: (open: boolean) => void }) => {
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (demand) {
+      const initialAssignedIds = new Set(demand.demand_workers.map(dw => dw.worker_id));
+      setSelectedWorkerIds(initialAssignedIds);
+    }
+  }, [demand]);
+
+  const handleToggleWorker = (workerId: string) => {
+    setSelectedWorkerIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(workerId)) {
+        newSet.delete(workerId);
+      } else {
+        newSet.add(workerId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSave = async () => {
+    // Deleta todas as atribuições existentes para esta demanda
+    const { error: deleteError } = await supabase
+      .from('demand_workers')
+      .delete()
+      .eq('demand_id', demand.id);
+
+    if (deleteError) {
+      showError("Erro ao atualizar atribuições.");
+      return;
+    }
+
+    // Insere as novas atribuições
+    if (selectedWorkerIds.size > 0) {
+      const newAssignments = Array.from(selectedWorkerIds).map(worker_id => ({
+        demand_id: demand.id,
+        worker_id,
+      }));
+      const { error: insertError } = await supabase.from('demand_workers').insert(newAssignments);
+      if (insertError) {
+        showError("Erro ao salvar novas atribuições.");
+        return;
+      }
+    }
+    
+    showSuccess("Trabalhadores atribuídos com sucesso!");
+    onSave();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Atribuir Trabalhadores</DialogTitle>
+          <DialogDescription>Selecione os trabalhadores para a demanda "{demand.title}".</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 py-4 max-h-60 overflow-y-auto">
+          {workers.map(worker => (
+            <div key={worker.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-accent">
+              <Checkbox
+                id={`worker-${worker.id}`}
+                checked={selectedWorkerIds.has(worker.id)}
+                onCheckedChange={() => handleToggleWorker(worker.id)}
+              />
+              <Label htmlFor={`worker-${worker.id}`} className="flex-1 cursor-pointer">{worker.full_name}</Label>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSave}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,13 +110,17 @@ const LocationDetails = () => {
   const [isDemandDialogOpen, setIsDemandDialogOpen] = useState(false);
   const [newDemandTitle, setNewDemandTitle] = useState("");
   const [newDemandDate, setNewDemandDate] = useState<Date | undefined>();
+  const [workers, setWorkers] = useState<Profile[]>([]);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedDemand, setSelectedDemand] = useState<Demand | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchData = async () => {
     if (!id) return;
     setLoading(true);
     const { data, error } = await supabase
       .from("locations")
-      .select("*, demands(*, tasks(*))")
+      .select("*, demands(*, tasks(*), demand_workers(worker_id))")
       .eq("id", id)
       .order('start_date', { foreignTable: 'demands', ascending: false })
       .single();
@@ -50,9 +135,24 @@ const LocationDetails = () => {
     setLoading(false);
   };
 
+  const fetchWorkers = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'user');
+    if (error) {
+      showError("Erro ao buscar lista de trabalhadores.");
+    } else {
+      setWorkers(data || []);
+    }
+  };
+
   useEffect(() => {
     fetchData();
-  }, [id]);
+    if (profile?.role === 'admin' || profile?.role === 'supervisor') {
+      fetchWorkers();
+    }
+  }, [id, profile, refreshKey]);
 
   const handleCreateDemand = async () => {
     if (!newDemandTitle.trim() || !id || !location) {
@@ -70,7 +170,7 @@ const LocationDetails = () => {
         title: newDemandTitle, 
         user_id: location.user_id, 
         location_id: id,
-        start_date: newDemandDate.toISOString().split('T')[0] // Formato YYYY-MM-DD
+        start_date: newDemandDate.toISOString().split('T')[0]
       });
 
     if (error) {
@@ -80,7 +180,7 @@ const LocationDetails = () => {
       setNewDemandTitle("");
       setNewDemandDate(undefined);
       setIsDemandDialogOpen(false);
-      fetchData();
+      setRefreshKey(k => k + 1);
     }
   };
 
@@ -93,8 +193,13 @@ const LocationDetails = () => {
       showError(`Falha ao deletar demanda: ${error.message}`);
     } else {
       showSuccess("Demanda deletada com sucesso!");
-      fetchData();
+      setRefreshKey(k => k + 1);
     }
+  };
+
+  const handleOpenAssignDialog = (demand: Demand) => {
+    setSelectedDemand(demand);
+    setIsAssignDialogOpen(true);
   };
 
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
@@ -220,32 +325,38 @@ const LocationDetails = () => {
                         </span>
                       )}
                     </Link>
-                    <div className="flex items-center flex-shrink-0">
+                    <div className="flex items-center flex-shrink-0 gap-1">
                       <span className="text-xs text-muted-foreground mr-2">
                         {demand.start_date ? format(new Date(demand.start_date + 'T00:00:00'), "dd/MM/yyyy") : new Date(demand.created_at).toLocaleDateString()}
                       </span>
-                      {profile?.role === 'admin' && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
-                                Deletar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      {(profile?.role === 'admin' || profile?.role === 'supervisor') && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => handleOpenAssignDialog(demand)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Atribuir
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta ação irá deletar permanentemente a demanda "{demand.title}" e todos os seus dados.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteDemand(demand.id)} className="bg-destructive hover:bg-destructive/90">
+                                  Deletar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
                       )}
                     </div>
                   </li>
@@ -268,6 +379,15 @@ const LocationDetails = () => {
           </CardFooter>
         )}
       </Card>
+      {selectedDemand && (
+        <AssignWorkerDialog
+          demand={selectedDemand}
+          workers={workers}
+          open={isAssignDialogOpen}
+          onOpenChange={setIsAssignDialogOpen}
+          onSave={() => setRefreshKey(k => k + 1)}
+        />
+      )}
     </div>
   );
 };
