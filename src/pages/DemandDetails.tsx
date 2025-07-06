@@ -103,14 +103,21 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const { formatted: formattedDuration, seconds: actualDurationSeconds } = calculateDuration();
 
   const renderStatus = () => {
+    const presumedTimeInSeconds = task.presumed_hours ? task.presumed_hours * 3600 : 0;
+    
+    const presumedTimeElement = presumedTimeInSeconds > 0 ? (
+      <div className="text-xs mt-1 text-muted-foreground">
+        <span>Prev: {formatTotalTime(presumedTimeInSeconds)}</span>
+      </div>
+    ) : null;
+
     if (task.is_completed) {
       let statusColor = "text-green-600";
-      let comparisonElement = null;
+      let comparisonMessage = null;
 
-      if (task.presumed_hours !== null && task.presumed_hours !== undefined) {
-        const presumedSeconds = task.presumed_hours * 3600;
-        const differenceSeconds = actualDurationSeconds - presumedSeconds;
-        const toleranceSeconds = presumedSeconds * 0.15; // 15% tolerance
+      if (presumedTimeInSeconds > 0) {
+        const differenceSeconds = actualDurationSeconds - presumedTimeInSeconds;
+        const toleranceSeconds = presumedTimeInSeconds * 0.15; // 15% tolerance
 
         let message = "";
         let messageColor = "";
@@ -124,12 +131,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
           message = `(-${formatTotalTime(Math.abs(differenceSeconds))})`;
         }
         
-        comparisonElement = (
-          <div className="text-xs mt-1">
-              <span>Prev: {task.presumed_hours.toFixed(2).replace('.',',')}h</span>
-              {message && <span className={`ml-1 ${messageColor}`}>{message}</span>}
-          </div>
-        );
+        comparisonMessage = message && <span className={`ml-1 ${messageColor}`}>{message}</span>;
       }
 
       return (
@@ -137,7 +139,12 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
           <CheckCircle2 className="h-5 w-5" />
           <span className="text-xs font-semibold">Concluída</span>
           <span className="text-xs font-mono">{formattedDuration}</span>
-          {comparisonElement}
+          {presumedTimeInSeconds > 0 && (
+            <div className="text-xs mt-1">
+              <span>Prev: {formatTotalTime(presumedTimeInSeconds)}</span>
+              {comparisonMessage}
+            </div>
+          )}
         </div>
       );
     }
@@ -146,6 +153,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         <div className="flex flex-col items-center text-blue-600">
           <Clock className="h-5 w-5" />
           <span className="text-xs font-semibold">Em Andamento</span>
+          {presumedTimeElement}
         </div>
       );
     }
@@ -153,6 +161,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
       <div className="flex flex-col items-center text-muted-foreground">
         <Clock className="h-5 w-5" />
         <span className="text-xs font-semibold">Pendente</span>
+        {presumedTimeElement}
       </div>
     );
   };
