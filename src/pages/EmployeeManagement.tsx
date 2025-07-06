@@ -197,7 +197,7 @@ const EmployeeManagement = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="hourlyCost">Custo/Hora (R$)</Label>
+                <Label htmlFor="hourlyCost">Custo/Hora ($)</Label>
                 <Input id="hourlyCost" type="number" value={hourlyCost} onChange={(e) => setHourlyCost(e.target.value)} placeholder="Ex: 25.50" />
               </div>
             </div>
@@ -245,7 +245,7 @@ const EmployeeManagement = () => {
                  {profile.hourly_cost && profile.hourly_cost > 0 && (
                   <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                     <DollarSign className="h-4 w-4" />
-                    <span>{`R$ ${profile.hourly_cost.toFixed(2).replace('.', ',')} / hora`}</span>
+                    <span>{`$${profile.hourly_cost.toFixed(2)} / hora`}</span>
                   </div>
                 )}
               </CardContent>

@@ -123,12 +123,12 @@ const Index = () => {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard 
             title="Valor a Receber (Semana)"
-            value={`R$ ${userStats.totalCostWeek.toFixed(2).replace('.', ',')}`}
+            value={`$ ${userStats.totalCostWeek.toFixed(2)}`}
             icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           />
           <StatCard 
             title="Valor a Receber (Mês)"
-            value={`R$ ${userStats.totalCostMonth.toFixed(2).replace('.', ',')}`}
+            value={`$ ${userStats.totalCostMonth.toFixed(2)}`}
             icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           />
           <StatCard 

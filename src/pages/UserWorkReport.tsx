@@ -144,7 +144,7 @@ const UserWorkReport = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground"><DollarSign className="h-4 w-4" /> Custo Total</span>
-                  <span className="font-semibold text-green-600">R$ {userData.total_cost.toFixed(2).replace('.', ',')}</span>
+                  <span className="font-semibold text-green-600">$ {userData.total_cost.toFixed(2)}</span>
                 </div>
               </CardContent>
             </Card>

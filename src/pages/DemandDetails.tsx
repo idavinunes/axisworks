@@ -196,7 +196,7 @@ const TaskItem = ({ task, onUpdate, demandStartDate, profile }: { task: Task, on
       {task.profiles && (
         <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-2 mt-2">
           <div className="flex items-center gap-2"><User className="h-3 w-3" /><span>{task.profiles.full_name}</span></div>
-          {task.status === 'approved' && task.profiles.hourly_cost && (<div className="flex items-center gap-2 font-mono"><DollarSign className="h-3 w-3" /><span>Custo: R$ {((calculateDuration().seconds / 3600) * (task.profiles.hourly_cost || 0)).toFixed(2).replace('.', ',')}</span></div>)}
+          {task.status === 'approved' && task.profiles.hourly_cost && (<div className="flex items-center gap-2 font-mono"><DollarSign className="h-3 w-3" /><span>Cost: ${((calculateDuration().seconds / 3600) * (task.profiles.hourly_cost || 0)).toFixed(2)}</span></div>)}
         </div>
       )}
       <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
@@ -337,7 +337,7 @@ const DemandDetails = () => {
               </div>
               {totalCost > 0 && (
                 <div className="flex items-center justify-end gap-2">
-                  <p className="font-bold text-lg text-green-600">R$ {totalCost.toFixed(2).replace('.', ',')}</p>
+                  <p className="font-bold text-lg text-green-600">$ {totalCost.toFixed(2)}</p>
                   <DollarSign className="h-5 w-5 text-muted-foreground" />
                 </div>
               )}
