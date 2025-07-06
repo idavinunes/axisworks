@@ -1,24 +1,27 @@
 import { useSession } from '@/contexts/SessionContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { LogOut, Menu, Briefcase } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Nav } from './Nav';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { showError } from '@/utils/toast';
 
 const Header = () => {
   const { user, profile } = useSession();
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
+    queryClient.clear(); // Limpa o cache do react-query para remover dados do usuário
     if (error) {
       console.error("Error logging out:", error);
-    } else {
-      navigate('/login');
+      showError(`Erro ao sair: ${error.message}`);
     }
+    // A navegação agora é tratada pelo ProtectedRoute,
+    // que reage à mudança no estado da sessão.
   };
 
   return (
