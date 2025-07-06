@@ -45,7 +45,7 @@ serve(async (req) => {
       .from('profiles')
       .update({ 
         role: role,
-        hourly_cost: !isNaN(parsedCost) ? parsedCost : 0, // CORRIGIDO: Converte o valor para número
+        hourly_cost: !isNaN(parsedCost) ? parsedCost : 0,
         status: 'pending'
       })
       .eq('id', newUser.id);
@@ -60,8 +60,8 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error)_ {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error) {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
