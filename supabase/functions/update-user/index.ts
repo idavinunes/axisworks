@@ -39,14 +39,19 @@ serve(async (req) => {
       throw new Error(`Erro ao atualizar dados de autenticação: ${authError.message}`);
     }
 
-    // 2. Atualiza o perfil público
+    // 2. Atualiza o perfil público dinamicamente
+    const profileUpdatePayload: { full_name: string; role: string; hourly_cost?: number } = {
+      full_name,
+      role,
+    };
+
+    if (hourly_cost !== undefined) {
+      profileUpdatePayload.hourly_cost = hourly_cost;
+    }
+
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({ 
-        full_name, 
-        role,
-        hourly_cost: hourly_cost || 0
-      })
+      .update(profileUpdatePayload)
       .eq('id', user_id);
 
     if (profileError) {
