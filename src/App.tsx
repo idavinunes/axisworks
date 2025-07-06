@@ -13,6 +13,7 @@ import Layout from "./components/Layout";
 import DemandDetails from "./pages/DemandDetails";
 import Locations from "./pages/Locations";
 import LocationDetails from "./pages/LocationDetails";
+import UserWorkReport from "./pages/UserWorkReport";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
                 <Route path="/locations" element={<Locations />} />
                 <Route path="/locations/:id" element={<LocationDetails />} />
                 <Route path="/demands/:id" element={<DemandDetails />} />
+                <Route path="/reports/users" element={<UserWorkReport />} />
               </Route>
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

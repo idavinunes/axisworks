@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, MapPin, Briefcase, CheckSquare, AlertTriangle } from "lucide-react";
+import { Users, MapPin, Briefcase, CheckSquare, AlertTriangle, BarChart3 } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { supabase } from "@/integrations/supabase/client";
 import StatCard from "@/components/dashboard/StatCard";
@@ -117,22 +117,40 @@ const Index = () => {
         </Card>
 
         {(profile?.role === "admin" || profile?.role === "supervisor") && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">
-                Gerenciamento de Equipe
-              </CardTitle>
-              <Users className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <CardDescription>
-                Cadastre e gerencie os funcionários da sua equipe.
-              </CardDescription>
-              <Button asChild className="mt-4">
-                <Link to="/employees">Gerenciar Funcionários</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-medium">
+                  Gerenciamento de Equipe
+                </CardTitle>
+                <Users className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Cadastre e gerencie os funcionários da sua equipe.
+                </CardDescription>
+                <Button asChild className="mt-4">
+                  <Link to="/employees">Gerenciar Funcionários</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="md:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-medium">
+                  Relatórios
+                </CardTitle>
+                <BarChart3 className="h-5 w-5 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <CardDescription>
+                  Visualize o desempenho da sua equipe, incluindo horas trabalhadas e custos.
+                </CardDescription>
+                <Button asChild className="mt-4">
+                  <Link to="/reports/users">Ver Relatório de Horas</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </div>
