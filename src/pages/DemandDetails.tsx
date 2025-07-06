@@ -1,16 +1,18 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Demand, Task } from "@/types";
+import { Demand, Task, Location } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import PhotoCapture from "@/components/PhotoCapture";
-import { PlusCircle, Timer, Camera, ArrowLeft, Trash2, MapPin } from "lucide-react";
+import { PlusCircle, Timer, Camera, ArrowLeft, Trash2, MapPin, Map } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
   const [isTiming, setIsTiming] = useState(false);
@@ -281,6 +283,11 @@ const DemandDetails = () => {
     return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
   };
 
+  const generateMapsUrl = (loc: Location) => {
+    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+  };
+
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!demand) return <div className="p-4 text-center">Demanda não encontrada.</div>;
 
@@ -293,19 +300,38 @@ const DemandDetails = () => {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
-            <div>
+            <div className="flex-grow">
               <CardTitle className="text-2xl">{demand.title}</CardTitle>
               {demand.locations && (
-                <CardDescription className="flex items-start gap-2 pt-2 text-base">
-                  <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold">{demand.locations.client_name}</p>
-                    <p className="text-muted-foreground">{formatAddress(demand.locations)}</p>
+                <CardDescription className="flex items-center gap-2 pt-2 text-base">
+                  <div className="flex items-start gap-2 flex-grow">
+                    <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold">{demand.locations.client_name}</p>
+                      <p className="text-muted-foreground">{formatAddress(demand.locations)}</p>
+                    </div>
                   </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={generateMapsUrl(demand.locations)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}
+                        >
+                          <Map className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Abrir no Google Maps</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </CardDescription>
               )}
             </div>
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               <p className="font-bold text-lg">{formatTotalTime(totalDuration)}</p>
               <p className="text-sm text-muted-foreground">Tempo Total</p>
             </div>

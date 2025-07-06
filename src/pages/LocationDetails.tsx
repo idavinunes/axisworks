@@ -3,13 +3,15 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Location, Demand } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, ArrowLeft, Trash2, MapPin } from "lucide-react";
+import { PlusCircle, ArrowLeft, Trash2, MapPin, Map } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const LocationDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -75,6 +77,11 @@ const LocationDetails = () => {
     return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
   };
 
+  const generateMapsUrl = (loc: Location) => {
+    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+  };
+
   if (loading) return <div className="p-4 text-center">Carregando...</div>;
   if (!location) return <div className="p-4 text-center">Local não encontrado.</div>;
 
@@ -86,10 +93,31 @@ const LocationDetails = () => {
       </Link>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">{location.client_name}</CardTitle>
-          <CardDescription className="flex items-center gap-2 pt-1">
-            <MapPin className="h-4 w-4" /> {formatAddress(location)}
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div className="flex-grow">
+              <CardTitle className="text-2xl">{location.client_name}</CardTitle>
+              <CardDescription className="flex items-center gap-2 pt-1">
+                <MapPin className="h-4 w-4" /> {formatAddress(location)}
+              </CardDescription>
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href={generateMapsUrl(location)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(buttonVariants({ variant: "outline", size: "icon" }), "ml-4 flex-shrink-0")}
+                  >
+                    <Map className="h-5 w-5" />
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Abrir no Google Maps</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </CardHeader>
       </Card>
 

@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Location } from "@/types";
-import { PlusCircle, MapPin, Trash2, ArrowLeft, Pencil } from "lucide-react";
+import { PlusCircle, MapPin, Trash2, ArrowLeft, Pencil, Map } from "lucide-react";
 import { useSession } from "@/contexts/SessionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Link } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 const Locations = () => {
   const { user } = useSession();
@@ -122,6 +124,11 @@ const Locations = () => {
     return `${loc.street_name}, ${loc.street_number}${loc.unit_number ? `, ${loc.unit_number}` : ''} - ${loc.city}, ${loc.state} ${loc.zip_code}`;
   };
 
+  const generateMapsUrl = (loc: Location) => {
+    const address = `${loc.street_name}, ${loc.street_number}, ${loc.city}, ${loc.state} ${loc.zip_code}`;
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+  };
+
   return (
     <div className="space-y-6">
       <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
@@ -215,9 +222,29 @@ const Locations = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
-                    <p>{formatAddress(location)}</p>
+                  <div className="flex items-start justify-between gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-1 flex-shrink-0" />
+                      <p>{formatAddress(location)}</p>
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={generateMapsUrl(location)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 flex-shrink-0")}
+                          >
+                            <Map className="h-4 w-4" />
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Abrir no Google Maps</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </CardContent>
               </Card>
