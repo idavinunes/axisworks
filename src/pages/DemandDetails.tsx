@@ -126,7 +126,7 @@ const TaskItem = ({ task, onUpdate }: { task: Task, onUpdate: () => void }) => {
         
         comparisonElement = (
           <div className="text-xs mt-1">
-              <span>Prev: {task.presumed_hours}h</span>
+              <span>Prev: {task.presumed_hours.toFixed(2).replace('.',',')}h</span>
               {message && <span className={`ml-1 ${messageColor}`}>{message}</span>}
           </div>
         );
@@ -228,7 +228,8 @@ const DemandDetails = () => {
   const [demand, setDemand] = useState<Demand | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newPresumedHours, setNewPresumedHours] = useState("");
+  const [newPresumedH, setNewPresumedH] = useState("");
+  const [newPresumedM, setNewPresumedM] = useState("");
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -290,11 +291,16 @@ const DemandDetails = () => {
       showError("O título da tarefa é obrigatório.");
       return;
     }
-    const presumedHoursValue = newPresumedHours ? parseFloat(newPresumedHours) : null;
-    if (newPresumedHours && (isNaN(presumedHoursValue) || presumedHoursValue < 0)) {
-        showError("Horas presumidas deve ser um número válido.");
+    
+    const hours = parseInt(newPresumedH, 10) || 0;
+    const minutes = parseInt(newPresumedM, 10) || 0;
+
+    if (hours < 0 || minutes < 0 || minutes >= 60) {
+        showError("Valores de horas ou minutos inválidos. Os minutos devem ser menores que 60.");
         return;
     }
+
+    const presumedHoursValue = (hours > 0 || minutes > 0) ? (hours + minutes / 60) : null;
 
     const { error } = await supabase.from("tasks").insert({ 
         demand_id: id, 
@@ -307,7 +313,8 @@ const DemandDetails = () => {
     } else {
       showSuccess("Tarefa adicionada com sucesso!");
       setNewTaskTitle("");
-      setNewPresumedHours("");
+      setNewPresumedH("");
+      setNewPresumedM("");
       setIsAddTaskDialogOpen(false);
       forceRefresh();
     }
@@ -383,14 +390,29 @@ const DemandDetails = () => {
                     <Input id="task-title" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex: Limpar a área externa" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="presumed-hours">Horas Presumidas (Opcional)</Label>
-                    <Input 
-                      id="presumed-hours" 
-                      type="number" 
-                      value={newPresumedHours} 
-                      onChange={(e) => setNewPresumedHours(e.target.value)}
-                      placeholder="Ex: 1.5 (para 1h 30m)"
-                    />
+                    <Label>Horas Presumidas (Opcional)</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                            <Label htmlFor="presumed-h" className="text-xs text-muted-foreground">Horas</Label>
+                            <Input 
+                                id="presumed-h" 
+                                type="number" 
+                                value={newPresumedH} 
+                                onChange={(e) => setNewPresumedH(e.target.value)}
+                                placeholder="Ex: 1"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="presumed-m" className="text-xs text-muted-foreground">Minutos</Label>
+                            <Input 
+                                id="presumed-m" 
+                                type="number" 
+                                value={newPresumedM} 
+                                onChange={(e) => setNewPresumedM(e.target.value)}
+                                placeholder="Ex: 30"
+                            />
+                        </div>
+                    </div>
                   </div>
                 </div>
                 <DialogFooter>
