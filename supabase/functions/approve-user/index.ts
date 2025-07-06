@@ -12,16 +12,26 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Crie um cliente Supabase com a Chave de Serviço (privilégios de administrador)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Verificar se o chamador é admin ou supervisor
-    const { data: { user } } = await supabaseAdmin.auth.getUser();
-    if (!user) throw new Error("Usuário não autenticado.");
+    // 2. Obtenha o JWT do cabeçalho de autorização para identificar quem está fazendo a chamada
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error("Cabeçalho de autorização ausente.");
+    }
+    const jwt = authHeader.replace('Bearer ', '');
 
+    // 3. Obtenha os dados do usuário que está fazendo a chamada a partir do JWT
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !user) {
+      throw new Error("Usuário não autenticado ou token inválido.");
+    }
+
+    // 4. Verifique se o usuário que está chamando a função é um administrador ou supervisor
     const { data: callerProfile, error: callerError } = await supabaseAdmin
       .from('profiles')
       .select('role')
@@ -32,12 +42,13 @@ serve(async (req) => {
       throw new Error("Acesso negado. Somente administradores ou supervisores podem aprovar usuários.");
     }
 
+    // 5. Obtenha o ID do usuário a ser aprovado do corpo da requisição
     const { user_id } = await req.json();
     if (!user_id) {
       throw new Error("O ID do usuário é obrigatório.");
     }
 
-    // Atualizar o status do usuário para 'active'
+    // 6. Atualize o status do usuário para 'active'
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update({ status: 'active' })
