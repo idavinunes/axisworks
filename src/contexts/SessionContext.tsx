@@ -1,7 +1,13 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { Profile } from '@/types';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { Profile } from "@/types";
 
 interface SessionContextValue {
   session: Session | null;
@@ -10,7 +16,9 @@ interface SessionContextValue {
   loading: boolean;
 }
 
-const SessionContext = createContext<SessionContextValue | undefined>(undefined);
+const SessionContext = createContext<SessionContextValue | undefined>(
+  undefined
+);
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -18,46 +26,48 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    
+    let initialized = false;
+
     const fetchSessionAndProfile = async (currentSession: Session | null) => {
+      if (initialized) return; // impede duplo bootstrap
+      initialized = true;
+
+      setLoading(true);
       setSession(currentSession);
+
       if (currentSession?.user) {
         try {
           const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentSession.user.id)
+            .from("profiles")
+            .select("*")
+            .eq("id", currentSession.user.id)
             .single();
 
-          if (profileError) {
-            throw profileError;
-          }
+          if (profileError) throw profileError;
+
           setProfile(profileData);
         } catch (error) {
-          console.error('Error fetching profile:', (error as Error).message);
+          console.error("Error fetching profile:", (error as Error).message);
           setProfile(null);
         }
       } else {
         setProfile(null);
       }
+
       setLoading(false);
     };
 
-    // Pega a sessão inicial
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      fetchSessionAndProfile(session);
+    });
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       fetchSessionAndProfile(session);
     });
 
-    // Escuta por mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setLoading(true);
-      await fetchSessionAndProfile(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const value = {
@@ -68,16 +78,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SessionContext.Provider value={value}>
-      {children}
-    </SessionContext.Provider>
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
 };
 
 export const useSession = () => {
   const context = useContext(SessionContext);
   if (context === undefined) {
-    throw new Error('useSession must be used within a SessionProvider');
+    throw new Error("useSession must be used within a SessionProvider");
   }
   return context;
 };
