@@ -26,12 +26,9 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let initialized = false;
+    let inicialized = false;
 
     const fetchSessionAndProfile = async (currentSession: Session | null) => {
-      if (initialized) return; // impede duplo bootstrap
-      initialized = true;
-
       setLoading(true);
       setSession(currentSession);
 
@@ -61,10 +58,14 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       fetchSessionAndProfile(session);
+      inicialized = true;
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      fetchSessionAndProfile(session);
+      if (!inicialized) {
+        fetchSessionAndProfile(session);
+        inicialized = true;
+      }
     });
 
     return () => subscription.unsubscribe();
